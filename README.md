@@ -1,7 +1,6 @@
 # DeepSeek-Refined
 
-一个 Tampermonkey 用户脚本，为网页版 DeepSeek Chat (chat.deepseek.com) 注入 Obsidian Border 主题风格的 Markdown 美化样式。通过覆盖 DeepSeek 的 CSS ，实现深色/浅色模式的全面配色定制。支持粗体、斜体、行内代码、数学公式的颜色自定义；各级标题左侧添加彩色圆角竖条装饰；引用块使用 Border 标志性的点阵图案背景。同时调整消息宽度为 75% 以获得更好的阅读体验。安装后自动跟随系统深浅色模式切换，无需手动配置。配色灵感来源于 Obsidian Border 主题。
-
+一个 Tampermonkey 用户脚本，为网页版 DeepSeek注入 Obsidian Border 主题风格的 Markdown 美化样式。通过覆盖 DeepSeek 的 CSS，实现深色/浅色模式的全面配色定制。支持粗体、斜体、行内代码、数学公式的颜色自定义；各级标题左侧添加彩色圆角竖条装饰；引用块使用 Border 标志性的点阵图案背景。同时调整消息宽度为 75% 以获得更好的阅读体验。安装后自动跟随系统深浅色模式切换。
 
 ![对比图](https://i-blog.csdnimg.cn/direct/5848e2ca601447409c7f807768158d99.png)
 
@@ -16,19 +15,19 @@
 
 ### Markdown 元素美化
 
-| 元素          | 深色模式                                                              | 浅色模式                                                                                      |
-| ----------- | --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| 粗体 (bold)   | ![#ff7881](https://placehold.co/12x12/ff7881/ff7881.png) `#ff7881`   | ![hsl(350,80%,55%)](https://placehold.co/12x12/e03045/e03045.png) `hsl(350, 80%, 55%)`        |
-| 斜体 (italic) | ![#fbbb83](https://placehold.co/12x12/fbbb83/fbbb83.png) `#fbbb83`   | ![hsl(28,80%,50%)](https://placehold.co/12x12/e67e00/e67e00.png) `hsl(28, 80%, 50%)`          |
-| 行内代码        | ![#f2b6de](https://placehold.co/12x12/f2b6de/f2b6de.png) `#f2b6de`   | ![#dd1399](https://placehold.co/12x12/dd1399/dd1399.png) `#dd1399`                            |
-| 数学公式        | ![#3b82f6](https://placehold.co/12x12/3b82f6/3b82f6.png) `#3b82f6`   | ![#3b82f6](https://placehold.co/12x12/3b82f6/3b82f6.png) `#3b82f6`                            |
+| 元素          | 深色模式                                                               | 浅色模式                                                                                   |
+| ----------- | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
+| 粗体 (bold)   | ![#ff7881](https://placehold.co/12x12/ff7881/ff7881.png) `#ff7881` | ![hsl(350,80%,55%)](https://placehold.co/12x12/e03045/e03045.png) `hsl(350, 80%, 55%)` |
+| 斜体 (italic) | ![#fbbb83](https://placehold.co/12x12/fbbb83/fbbb83.png) `#fbbb83` | ![hsl(28,80%,50%)](https://placehold.co/12x12/e67e00/e67e00.png) `hsl(28, 80%, 50%)`   |
+| 行内代码        | ![#f2b6de](https://placehold.co/12x12/f2b6de/f2b6de.png) `#f2b6de` | ![#dd1399](https://placehold.co/12x12/dd1399/dd1399.png) `#dd1399`                     |
+| 数学公式        | ![#3b82f6](https://placehold.co/12x12/3b82f6/3b82f6.png) `#3b82f6` | ![#3b82f6](https://placehold.co/12x12/3b82f6/3b82f6.png) `#3b82f6`                     |
 
 ### 标题样式
 
 各级标题左侧带有彩色圆角竖条:
 
-| 级别 | 深色模式                                                          | 浅色模式                                                          |
-| -- | ----------------------------------------------------------------- | ----------------------------------------------------------------- |
+| 级别 | 深色模式                                                               | 浅色模式                                                               |
+| -- | ------------------------------------------------------------------ | ------------------------------------------------------------------ |
 | H1 | ![#d18989](https://placehold.co/12x12/d18989/d18989.png) `#d18989` | ![#bd5151](https://placehold.co/12x12/bd5151/bd5151.png) `#bd5151` |
 | H2 | ![#cea38d](https://placehold.co/12x12/cea38d/cea38d.png) `#cea38d` | ![#c77b23](https://placehold.co/12x12/c77b23/c77b23.png) `#c77b23` |
 | H3 | ![#93c89c](https://placehold.co/12x12/93c89c/93c89c.png) `#93c89c` | ![#478f14](https://placehold.co/12x12/478f14/478f14.png) `#478f14` |
@@ -51,8 +50,8 @@
 ## 安装方法
 
 1. 安装 [Tampermonkey](https://www.tampermonkey.net/) 浏览器扩展
-2. 点击 Tampermonkey 图标 -> 添加新脚本
-3. 进入[greasyfork脚本](https://greasyfork.org/zh-CN/scripts/585012-deepseek%E7%BE%8E%E5%8C%96)并安装
+2. 进入  [DeepSeek 美化 - Greasy Fork](https://greasyfork.org/zh-CN/scripts/585012-deepseek%E7%BE%8E%E5%8C%96)   并安装
+
 ## 自定义修改
 
 ### 修改深色模式背景色
@@ -61,3 +60,5 @@
 body[data-ds-dark-theme] {
     --dsw-alias-bg-base: #你的颜色;
 }
+```
+
