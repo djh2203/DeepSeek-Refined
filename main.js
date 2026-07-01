@@ -85,13 +85,13 @@
         }
 
         /* 数学公式颜色 */
-        .ds-markdown-math,
-        .ds-markdown-math.katex-display,
-        .ds-markdown-math-display,
-        .ds-markdown-math-svg,
-        .katex,
-        .katex * {
-            color: #3b82f6 !important;
+        body[data-ds-dark-theme] .ds-markdown-math,
+        body[data-ds-dark-theme] .ds-markdown-math.katex-display,
+        body[data-ds-dark-theme] .ds-markdown-math-display,
+        body[data-ds-dark-theme] .ds-markdown-math-svg,
+        body[data-ds-dark-theme] .katex,
+        body[data-ds-dark-theme] .katex * {
+            color: #8dd3f6ff !important;
         }
 
         /* 行内代码颜色 */
