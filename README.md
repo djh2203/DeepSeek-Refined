@@ -50,7 +50,7 @@
 ## 安装方法
 
 1. 安装 [Tampermonkey](https://www.tampermonkey.net/) 浏览器扩展
-2. 进入  [DeepSeek 美化 - Greasy Fork](https://greasyfork.org/zh-CN/scripts/585012-deepseek%E7%BE%8E%E5%8C%96)   并安装
+2. 进入  [DeepSeek-Refined - Greasy Fork](https://greasyfork.org/zh-CN/scripts/585012-deepseek-refined)   并安装
 
 ## 自定义修改
 
