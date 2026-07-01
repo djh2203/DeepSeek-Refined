@@ -20,7 +20,7 @@
 | 粗体 (bold)   | ![#ff7881](https://placehold.co/12x12/ff7881/ff7881.png) `#ff7881` | ![hsl(350,80%,55%)](https://placehold.co/12x12/e03045/e03045.png) `hsl(350, 80%, 55%)` |
 | 斜体 (italic) | ![#fbbb83](https://placehold.co/12x12/fbbb83/fbbb83.png) `#fbbb83` | ![hsl(28,80%,50%)](https://placehold.co/12x12/e67e00/e67e00.png) `hsl(28, 80%, 50%)`   |
 | 行内代码        | ![#f2b6de](https://placehold.co/12x12/f2b6de/f2b6de.png) `#f2b6de` | ![#dd1399](https://placehold.co/12x12/dd1399/dd1399.png) `#dd1399`                     |
-| 数学公式        | ![#3b82f6](https://placehold.co/12x12/3b82f6/3b82f6.png) `#3b82f6` | ![#3b82f6](https://placehold.co/12x12/3b82f6/3b82f6.png) `#3b82f6`                     |
+| 数学公式        | ![#8dd3f6](https://placehold.co/12x12/8dd3f6/8dd3f6.png) `#8dd3f6` | ![#3b82f6](https://placehold.co/12x12/3b82f6/3b82f6.png) `#3b82f6`                     |
 
 ### 标题样式
 
