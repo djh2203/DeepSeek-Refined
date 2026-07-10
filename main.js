@@ -12,6 +12,9 @@
 (function() {
     'use strict';
 
+    if (window.__deepseek_refined_initialized) return;
+    window.__deepseek_refined_initialized = true;
+
     const style = document.createElement('style');
     style.textContent = `
             :root {
@@ -245,6 +248,116 @@
                 border-radius: 4px;
                 background: var(--dsw-alias-brand-primary);
             }
+
+            /* ========== 行内代码点击复制样式 ========== */
+            .ds-markdown code:not(pre code):not(.md-code-block code) {
+                cursor: pointer;
+            }
+
+            /* Toast 弹窗样式 */
+            .ds-copy-toast {
+                position: fixed;
+                top: 16px;
+                left: 50%;
+                transform: translateX(-50%) translateY(-20px);
+                background: #fff;
+                border-radius: 8px;
+                padding: 12px 20px;
+                box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                z-index: 99999;
+                opacity: 0;
+                transition: all 0.3s ease;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                font-size: 14px;
+                color: #333;
+            }
+            .ds-copy-toast.show {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0);
+            }
+            .ds-copy-toast-icon {
+                width: 20px;
+                height: 20px;
+                background: #52c41a;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                flex-shrink: 0;
+            }
+            .ds-copy-toast-icon svg {
+                width: 12px;
+                height: 12px;
+                fill: none;
+                stroke: #fff;
+                stroke-width: 2.5;
+                stroke-linecap: round;
+                stroke-linejoin: round;
+            }
+
+            /* 深色模式 Toast */
+            body[data-ds-dark-theme] .ds-copy-toast {
+                background: #2d2e34;
+                color: #e0e0e0;
+                box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+            }
         `;
     document.head.appendChild(style);
+
+    // ========== 行内代码点击复制功能 ==========
+    function showToast(message) {
+        const existing = document.querySelector('.ds-copy-toast');
+        if (existing) existing.remove();
+
+        const toast = document.createElement('div');
+        toast.className = 'ds-copy-toast';
+        toast.innerHTML = `
+            <div class="ds-copy-toast-icon">
+                <svg viewBox="0 0 24 24">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+            </div>
+            <span>${message}</span>
+        `;
+        document.body.appendChild(toast);
+
+        requestAnimationFrame(() => {
+            toast.classList.add('show');
+        });
+
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 300);
+        }, 2000);
+    }
+
+    function isInlineCode(el) {
+        if (el.tagName !== 'CODE') return false;
+        if (el.closest('pre')) return false;
+        if (el.closest('.md-code-block')) return false;
+        if (el.closest('.md-code-block-banner-wrap')) return false;
+        return true;
+    }
+
+    document.addEventListener('click', function(e) {
+        const code = e.target.closest('code');
+        if (code && isInlineCode(code)) {
+            e.preventDefault();
+            e.stopPropagation();
+            navigator.clipboard.writeText(code.textContent).then(() => {
+                showToast('成功复制到剪贴板！');
+            }).catch(() => {
+                const textArea = document.createElement('textarea');
+                textArea.value = code.textContent;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                showToast('成功复制到剪贴板！');
+            });
+        }
+    }, true);
 })();
