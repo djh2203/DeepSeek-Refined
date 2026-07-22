@@ -1,5 +1,12 @@
 # DeepSeek-Refined
-
+<p align="center">
+  <img src="https://img.shields.io/github/stars/djh2203/DeepSeek-Refined?style=flat-square&logo=github" alt="stars" />
+  <img src="https://img.shields.io/github/license/djh2203/DeepSeek-Refined?style=flat-square" alt="license" />
+  <img src="https://img.shields.io/badge/DeepSeek-5786FE?style=flat-square&logo=deepseek&logoColor=white" alt="DeepSeek" />
+  <img src="https://img.shields.io/badge/Obsidian-7C3AED?style=flat-square&logo=obsidian&logoColor=white" alt="Obsidian" />
+  <img src="https://img.shields.io/badge/JavaScript-F7DF1E?style=flat-square&logo=javascript&logoColor=black" alt="JavaScript" />
+  <img src="https://img.shields.io/badge/Tampermonkey-0049B0?style=flat-square&logo=tampermonkey&logoColor=white" alt="Tampermonkey" />
+</p>
 一个 Tampermonkey 用户脚本，为网页版 DeepSeek注入 Obsidian Border 主题风格的 Markdown 美化样式。通过覆盖 DeepSeek 的 CSS，实现深色/浅色模式的全面配色定制。支持粗体、斜体、行内代码、数学公式的颜色自定义；各级标题左侧添加彩色圆角竖条装饰；引用块使用 Border 标志性的点阵图案背景。同时调整消息宽度为 75% 以获得更好的阅读体验。安装后自动跟随系统深浅色模式切换。
 
 ![对比图](https://i-blog.csdnimg.cn/direct/5848e2ca601447409c7f807768158d99.png)
