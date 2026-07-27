@@ -1,5 +1,12 @@
 # DeepSeek-Refined
-
+<p align="center">
+  <img src="https://img.shields.io/github/stars/djh2203/DeepSeek-Refined?style=flat-square&logo=github" alt="stars" />
+  <img src="https://img.shields.io/github/license/djh2203/DeepSeek-Refined?style=flat-square" alt="license" />
+  <img src="https://img.shields.io/badge/DeepSeek-5786FE?style=flat-square&logo=deepseek&logoColor=white" alt="DeepSeek" />
+  <img src="https://img.shields.io/badge/Obsidian-7C3AED?style=flat-square&logo=obsidian&logoColor=white" alt="Obsidian" />
+  <img src="https://img.shields.io/badge/JavaScript-F7DF1E?style=flat-square&logo=javascript&logoColor=black" alt="JavaScript" />
+  <img src="https://img.shields.io/badge/Tampermonkey-0049B0?style=flat-square&logo=tampermonkey&logoColor=white" alt="Tampermonkey" />
+</p>
 一个 Tampermonkey 用户脚本，为网页版 DeepSeek注入 Obsidian Border 主题风格的 Markdown 美化样式。通过覆盖 DeepSeek 的 CSS，实现深色/浅色模式的全面配色定制。支持粗体、斜体、行内代码、数学公式的颜色自定义；各级标题左侧添加彩色圆角竖条装饰；引用块使用 Border 标志性的点阵图案背景。同时调整消息宽度为 75% 以获得更好的阅读体验。安装后自动跟随系统深浅色模式切换。
 
 ![对比图](https://i-blog.csdnimg.cn/direct/5848e2ca601447409c7f807768158d99.png)
@@ -9,7 +16,7 @@
 ### 全局配色
 
 - 深色模式背景: ![#27282e](https://placehold.co/12x12/27282e/27282e.png) `#27282e`
-- 浅色模式背景: ![#ffffff](https://placehold.co/12x12/ffffff/ffffff.png) `#ffffff`
+- 浅色模式背景: **动态渐变背景** - 使用柔和的粉色、紫色渐变，带有轻微的流动动画效果
 - 文字颜色采用 Border 主题的柔和灰度配色
 - 支持深色/浅色模式自动切换
 
@@ -20,7 +27,7 @@
 | 粗体 (bold)   | ![#ff7881](https://placehold.co/12x12/ff7881/ff7881.png) `#ff7881` | ![hsl(350,80%,55%)](https://placehold.co/12x12/e03045/e03045.png) `hsl(350, 80%, 55%)` |
 | 斜体 (italic) | ![#fbbb83](https://placehold.co/12x12/fbbb83/fbbb83.png) `#fbbb83` | ![hsl(28,80%,50%)](https://placehold.co/12x12/e67e00/e67e00.png) `hsl(28, 80%, 50%)`   |
 | 行内代码        | ![#f2b6de](https://placehold.co/12x12/f2b6de/f2b6de.png) `#f2b6de` | ![#dd1399](https://placehold.co/12x12/dd1399/dd1399.png) `#dd1399`                     |
-| 数学公式        | ![#3b82f6](https://placehold.co/12x12/3b82f6/3b82f6.png) `#3b82f6` | ![#3b82f6](https://placehold.co/12x12/3b82f6/3b82f6.png) `#3b82f6`                     |
+| 数学公式        | ![#8dd3f6](https://placehold.co/12x12/8dd3f6/8dd3f6.png) `#8dd3f6` | ![#3b82f6](https://placehold.co/12x12/3b82f6/3b82f6.png) `#3b82f6`                     |
 
 ### 标题样式
 
@@ -47,10 +54,14 @@
 - 消息最大宽度: `75%`
 - 表格最大宽度: `70%`
 
+### 交互功能
+
+- **行内代码点击复制**: 点击任意行内代码（如 `code`）即可自动复制到剪贴板，并显示优雅的 Toast 提示
+
 ## 安装方法
 
 1. 安装 [Tampermonkey](https://www.tampermonkey.net/) 浏览器扩展
-2. 进入  [DeepSeek 美化 - Greasy Fork](https://greasyfork.org/zh-CN/scripts/585012-deepseek%E7%BE%8E%E5%8C%96)   并安装
+2. 进入  [DeepSeek-Refined - Greasy Fork](https://greasyfork.org/zh-CN/scripts/585012-deepseek-refined)   并安装
 
 ## 自定义修改
 
