@@ -9,7 +9,7 @@
 // @grant        none
 // ==/UserScript==
 
-(function() {
+(function () {
     'use strict';
 
     if (window.__deepseek_refined_initialized) return;
@@ -340,7 +340,7 @@
         return true;
     }
 
-    document.addEventListener('click', function(e) {
+    document.addEventListener('click', function (e) {
         const code = e.target.closest('code');
         if (code && isInlineCode(code)) {
             e.preventDefault();

@@ -63,8 +63,30 @@
 
 ## 安装方法
 
+### 方式一：Greasy Fork 安装（推荐）
+
 1. 安装 [Tampermonkey](https://www.tampermonkey.net/) 浏览器扩展
 2. 进入  [DeepSeek-Refined - Greasy Fork](https://greasyfork.org/zh-CN/scripts/585012-deepseek-refined)   并安装
+
+### 方式二：本地安装
+
+1. 在 GitHub 打开 [main.js](https://github.com/djh2203/DeepSeek-Refined/blob/main/main.js)
+2. 点击页面右上角的 **Raw**，复制全部代码
+3. 点击浏览器工具栏 Tampermonkey 图标 → **管理面板** → **+ 新建脚本**
+4. 删除默认内容，粘贴复制的代码，按 `Ctrl + S`（macOS 为 `Cmd + S`）保存
+
+## 更新与卸载
+
+- **更新**：Tampermonkey 会定期自动检查脚本版本，有新版本时会在管理面板提示，点击即可更新；也可在管理面板手动点击"检查更新"。
+- **卸载**：Tampermonkey 管理面板 → 找到 DeepSeek-Refined → 点击删除；想要临时关闭而不卸载，可点击开关暂停脚本。
+
+## 常见问题
+
+- **Q: 某天脚本突然失效，样式突然恢复成原样？**
+  A: 通常是 DeepSeek 前端改版、DOM 或 CSS 类名变动导致的。可先确认 Tampermonkey 已启用且脚本为最新版本；若仍无效，欢迎到 [GitHub Issues](https://github.com/djh2203/DeepSeek-Refined/issues) 反馈。
+
+- **Q: 想恢复官方默认样式？**
+  A: 在 Tampermonkey 管理面板暂停或删除本脚本即可，不会对 DeepSeek 本身产生任何改动。
 
 ## 自定义修改
 
