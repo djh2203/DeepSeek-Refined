@@ -54,20 +54,6 @@
                     radial-gradient(ellipse 80% 60% at 20% 40%, rgba(235, 213, 216, 0.5) 0%, transparent 70%),
                     radial-gradient(ellipse 70% 80% at 75% 25%, rgba(220, 209, 228, 0.4) 0%, transparent 70%),
                     radial-gradient(ellipse 60% 70% at 50% 80%, rgba(211, 224, 223, 0.45) 0%, transparent 70%);
-                background-size: 120% 120%;
-                animation: morningGardenShift 3s ease-in-out infinite alternate;
-            }
-
-            @keyframes morningGardenShift {
-                0% {
-                    background-position: 0% 0%, 100% 0%, 50% 100%;
-                }
-                50% {
-                    background-position: 80% 60%, 10% 80%, 90% 20%;
-                }
-                100% {
-                    background-position: 30% 90%, 70% 30%, 10% 60%;
-                }
             }
 
             /* 确保渐变背景生效 */
@@ -91,20 +77,28 @@
                     radial-gradient(ellipse 80% 60% at 20% 40%, rgba(235, 213, 216, 0.5) 0%, transparent 70%),
                     radial-gradient(ellipse 70% 80% at 75% 25%, rgba(220, 209, 228, 0.4) 0%, transparent 70%),
                     radial-gradient(ellipse 60% 70% at 50% 80%, rgba(211, 224, 223, 0.45) 0%, transparent 70%);
-                background-size: 120% 120%;
-                animation: morningGardenShift 3s ease-in-out infinite alternate;
                 pointer-events: none;
             }
-            /* ========== 深色模式 - Border 风格 ========== */
+            /* ========== 深色模式 - Border 主题配色 ========== */
             body[data-ds-dark-theme] {
-
-                /* === 新增：重置 body 背景 === */
+                /* === 重置 body 背景，清除浅色模式渐变 === */
                 background-image: none !important;
                 background-size: auto !important;
                 animation: none !important;
-                background-color: #27282e !important; /* 确保纯色背景 */
+                background-color: #27282e !important;
 
-                /* 同时清除所有继承的渐变（如 html、#root 等） */
+                --dsw-alias-bg-base: #27282e;
+                --dsw-alias-bg-layer-1: #27282e;
+                --dsw-alias-bg-layer-2: #2d2e34;
+                --dsw-alias-bg-layer-3: #32333a;
+
+                --dsw-alias-label-primary: hsl(232, 6%, 88%);
+                --dsw-alias-label-secondary: hsl(232, 9%, 64%);
+                --dsw-alias-label-tertiary: hsl(232, 12%, 48%);
+                --dsw-alias-label-caption: hsl(232, 9%, 56%);
+
+                --dsw-alias-brand-primary: hsl(232, 70%, 65%);
+                --dsw-alias-brand-text: hsl(232, 70%, 70%);
             }
             /* 侧边栏和输入区域透明化 */
             .b8812f16,
@@ -134,22 +128,6 @@
         body[data-ds-dark-theme]::before {
             display: none !important;
         }
-
-        /* ========== 深色模式 - Border 主题配色 ========== */
-            body[data-ds-dark-theme] {
-                --dsw-alias-bg-base: #27282e;
-                --dsw-alias-bg-layer-1: #27282e;
-                --dsw-alias-bg-layer-2: #2d2e34;
-                --dsw-alias-bg-layer-3: #32333a;
-
-                --dsw-alias-label-primary: hsl(232, 6%, 88%);
-                --dsw-alias-label-secondary: hsl(232, 9%, 64%);
-                --dsw-alias-label-tertiary: hsl(232, 12%, 48%);
-                --dsw-alias-label-caption: hsl(232, 9%, 56%);
-
-                --dsw-alias-brand-primary: hsl(232, 70%, 65%);
-                --dsw-alias-brand-text: hsl(232, 70%, 70%);
-            }
 
             /* 侧边栏背景同步 */
             body[data-ds-dark-theme] ._189b4a0,
