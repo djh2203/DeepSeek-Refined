@@ -82,10 +82,10 @@
 
 ## 常见问题
 
-- **Q: 某天脚本突然失效，样式突然恢复成原样？**
+- **Q: 某天脚本突然失效，样式突然恢复成原样？**  
   A: 通常是 DeepSeek 前端改版、DOM 或 CSS 类名变动导致的。可先确认 Tampermonkey 已启用且脚本为最新版本；若仍无效，欢迎到 [GitHub Issues](https://github.com/djh2203/DeepSeek-Refined/issues) 反馈。
 
-- **Q: 想恢复官方默认样式？**
+- **Q: 想恢复官方默认样式？**  
   A: 在 Tampermonkey 管理面板暂停或删除本脚本即可，不会对 DeepSeek 本身产生任何改动。
 
 ## 自定义修改
