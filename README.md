@@ -90,11 +90,82 @@
 
 ## 自定义修改
 
+> 所有修改都在 `main.js` 顶部的 `<style>` 标签内进行。改完后保存脚本并刷新 DeepSeek 页面即可生效。
+
 ### 修改深色模式背景色
 
 ```css
 body[data-ds-dark-theme] {
-    --dsw-alias-bg-base: #你的颜色;
+    --dsw-alias-bg-base: #27282e;   /* 改为你的颜色，如 #1e1e2e */
+}
+```
+
+若侧边栏也需同步，同时修改下方硬编码的背景色：
+
+```css
+body[data-ds-dark-theme] ._189b4a0,
+body[data-ds-dark-theme] ._6ffc3c9 {
+    background-color: #27282e;      /* 与上面保持一致 */
+}
+```
+
+### 修改浅色模式背景色
+
+浅色背景在 `body` 和 `body::before` 两处定义了同样的 `background-color` 与 `background-image`，**两处都要改**。想换成纯色，把 `background-image` 删掉、只留 `background-color`：
+
+```css
+body {
+    background-color: #F9F6F4;      /* 改为你的颜色 */
+    background-image:
+        radial-gradient(ellipse 80% 60% at 20% 40%, rgba(235, 213, 216, 0.5) 0%, transparent 70%),
+        radial-gradient(ellipse 70% 80% at 75% 25%, rgba(220, 209, 228, 0.4) 0%, transparent 70%),
+        radial-gradient(ellipse 60% 70% at 50% 80%, rgba(211, 224, 223, 0.45) 0%, transparent 70%);
+}
+```
+
+### 修改 Markdown 元素颜色
+
+| 元素 | 深色模式 | 浅色模式 |
+| -- | -- | -- |
+| 粗体 | `body[data-ds-dark-theme] .ds-markdown strong` | `body .ds-markdown strong` |
+| 斜体 | `body[data-ds-dark-theme] .ds-markdown em` | `body .ds-markdown em` |
+| 行内代码 | `.ds-markdown code:not(pre code):not(.md-code-block code)` | 同上，前面加 `body:not([data-ds-dark-theme])` |
+| 数学公式 | `body[data-ds-dark-theme] .ds-markdown-math` | `body:not([data-ds-dark-theme]) .ds-markdown-math` |
+
+例如把深色模式粗体改成绿色：
+
+```css
+body[data-ds-dark-theme] .ds-markdown strong {
+    color: #98c379 !important;
+}
+```
+
+> 数学公式选择器较长（包含 `.katex` 及其子元素），直接修改对应块的 `color` 值即可。
+
+### 修改标题竖条颜色
+
+```css
+/* 深色模式 H1 */
+body[data-ds-dark-theme] .ds-markdown h1::before {
+    background: #d18989;            /* 改为你的颜色 */
+}
+```
+
+`h2` ~ `h6` 同理，浅色模式去掉 `[data-ds-dark-theme]` 前缀即可。
+
+### 修改消息宽度
+
+```css
+:root {
+    --message-list-max-width: 75%;  /* 改为 90% 等任意值 */
+}
+```
+
+### 修改表格宽度
+
+```css
+.ds-markdown table {
+    max-width: 70%;                 /* 改为 100% 等任意值 */
 }
 ```
 
