@@ -54,7 +54,7 @@
 
 ### 布局调整
 
-- 消息最大宽度: `75%`
+- 消息最大宽度: `75%`（仅宽屏 ≥768px 生效，手机端保持默认原样）
 - 表格最大宽度: `70%`
 
 ### 交互功能
@@ -156,10 +156,14 @@ body[data-ds-dark-theme] .ds-markdown h1::before {
 ### 修改消息宽度
 
 ```css
-:root {
-    --message-list-max-width: 75%;  /* 改为 90% 等任意值 */
+@media (min-width: 768px) {
+    :root {
+        --message-list-max-width: 75%;  /* 改为 90% 等任意值 */
+    }
 }
 ```
+
+手机端（<768px）不设置该变量，保持 DeepSeek 默认的全宽布局；如想调整断点，修改 `768px` 即可。
 
 ### 修改表格宽度
 
