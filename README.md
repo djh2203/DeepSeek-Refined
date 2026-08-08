@@ -22,18 +22,11 @@
 
 | 主题 | 浅色背景 | 深色背景 | 风格 |
 | -- | -- | -- | -- |
-| **Border**（默认） | `#F9F6F4` | `#27282e` | Obsidian Border 柔和配色 |
-| **Nord** | `#ECEFF4` | `#2E3440` | 北欧极光，低饱和蓝灰，护眼 |
-| **Twilight** | `#F7F3FB` | `#1A1124` | 紫色系，深色适合深夜 |
-| **GitHub** | `#FFFFFF` | `#0D1117` | GitHub 官方 Light/Dark |
-| **Atom One** | `#FAFAFA` | `#282C34` | Atom 编辑器经典配色 |
-
-### 全局配色（默认主题 Border）
-
-- 深色模式背景: ![#27282e](https://placehold.co/12x12/27282e/27282e.png) `#27282e`
-- 浅色模式背景: ![#F9F6F4](https://placehold.co/12x12/f9f6f4/f9f6f4.png) 纯色 `#F9F6F4`
-- 文字颜色采用 Border 主题的柔和灰度配色
-- 支持深色/浅色模式自动切换
+| **Border**（默认） | ![#F9F6F4](https://placehold.co/12x12/f9f6f4/f9f6f4.png) `#F9F6F4` | ![#27282e](https://placehold.co/12x12/27282e/27282e.png) `#27282e` | Obsidian Border 柔和配色 |
+| **Nord** | ![#ECEFF4](https://placehold.co/12x12/eceff4/eceff4.png) `#ECEFF4` | ![#2E3440](https://placehold.co/12x12/2e3440/2e3440.png) `#2E3440` | 北欧极光，低饱和蓝灰，护眼 |
+| **Twilight** | ![#F7F3FB](https://placehold.co/12x12/f7f3fb/f7f3fb.png) `#F7F3FB` | ![#1A1124](https://placehold.co/12x12/1a1124/1a1124.png) `#1A1124` | 紫色系，深色适合深夜 |
+| **GitHub** | ![#FFFFFF](https://placehold.co/12x12/ffffff/ffffff.png) `#FFFFFF` | ![#0D1117](https://placehold.co/12x12/0d1117/0d1117.png) `#0D1117` | GitHub 官方 Light/Dark |
+| **Atom One** | ![#FAFAFA](https://placehold.co/12x12/fafafa/fafafa.png) `#FAFAFA` | ![#282C34](https://placehold.co/12x12/282c34/282c34.png) `#282C34` | Atom 编辑器经典配色 |
 
 ### Markdown 元素美化（默认主题 Border）
 
