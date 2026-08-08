@@ -19,7 +19,7 @@
 ### 全局配色
 
 - 深色模式背景: ![#27282e](https://placehold.co/12x12/27282e/27282e.png) `#27282e`
-- 浅色模式背景: **柔和渐变背景** - 使用柔和的粉色、紫色渐变
+- 浅色模式背景: ![#F9F6F4](https://placehold.co/12x12/f9f6f4/f9f6f4.png) 纯色 `#F9F6F4`
 - 文字颜色采用 Border 主题的柔和灰度配色
 - 支持深色/浅色模式自动切换
 
@@ -111,17 +111,15 @@ body[data-ds-dark-theme] ._6ffc3c9 {
 
 ### 修改浅色模式背景色
 
-浅色背景在 `body` 和 `body::before` 两处定义了同样的 `background-color` 与 `background-image`，**两处都要改**。想换成纯色，把 `background-image` 删掉、只留 `background-color`：
+浅色背景是 `body` 上的纯色，只需改 `background-color` 一处：
 
 ```css
 body {
     background-color: #F9F6F4;      /* 改为你的颜色 */
-    background-image:
-        radial-gradient(ellipse 80% 60% at 20% 40%, rgba(235, 213, 216, 0.5) 0%, transparent 70%),
-        radial-gradient(ellipse 70% 80% at 75% 25%, rgba(220, 209, 228, 0.4) 0%, transparent 70%),
-        radial-gradient(ellipse 60% 70% at 50% 80%, rgba(211, 224, 223, 0.45) 0%, transparent 70%);
 }
 ```
+
+若希望根容器同步，下方 `background: inherit` 会自动跟随，无需额外改动。
 
 ### 修改 Markdown 元素颜色
 

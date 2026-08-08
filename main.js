@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DeepSeek-Refined
 // @namespace    https://github.com/djh2203/DeepSeek-Refined
-// @version      1.4
+// @version      1.5
 // @description  一个 Tampermonkey 用户脚本，为网页版 DeepSeek Chat (chat.deepseek.com) 注入 Obsidian Border 主题风格的 Markdown 美化样式。通过覆盖 DeepSeek 的 CSS 变量系统，实现深色/浅色模式的全面配色定制。支持粗体、斜体、行内代码、数学公式的颜色自定义；各级标题左侧添加彩色圆角竖条装饰；引用块使用 Border 标志性的点阵图案背景。同时调整消息宽度为 75% 以获得更好的阅读体验。安装后自动跟随系统深浅色模式切换，无需手动配置。配色灵感来源于 Obsidian Border 主题。
 // @author       djh2203
 // @match        https://chat.deepseek.com/*
@@ -51,40 +51,20 @@
                 --dsw-alias-markdown-code-block: #FEFBF5;
                 --dsw-alias-markdown-code-block-banner: #F7F0E3;
 
-                /* 动态渐变背景 */
+                /* 浅色模式纯色背景 */
                 background-color: #F9F6F4;
-                background-image:
-                    radial-gradient(ellipse 80% 60% at 20% 40%, rgba(235, 213, 216, 0.5) 0%, transparent 70%),
-                    radial-gradient(ellipse 70% 80% at 75% 25%, rgba(220, 209, 228, 0.4) 0%, transparent 70%),
-                    radial-gradient(ellipse 60% 70% at 50% 80%, rgba(211, 224, 223, 0.45) 0%, transparent 70%);
             }
 
-            /* 确保渐变背景生效 */
+            /* 确保纯色背景覆盖根容器 */
             html,
             #root,
             #root > div {
                 background: inherit !important;
             }
 
-            /* 额外的背景容器覆盖 */
-            body::before {
-                content: "";
-                position: fixed;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                z-index: -999;
-                background-color: #F9F6F4;
-                background-image:
-                    radial-gradient(ellipse 80% 60% at 20% 40%, rgba(235, 213, 216, 0.5) 0%, transparent 70%),
-                    radial-gradient(ellipse 70% 80% at 75% 25%, rgba(220, 209, 228, 0.4) 0%, transparent 70%),
-                    radial-gradient(ellipse 60% 70% at 50% 80%, rgba(211, 224, 223, 0.45) 0%, transparent 70%);
-                pointer-events: none;
-            }
             /* ========== 深色模式 - Border 主题配色 ========== */
             body[data-ds-dark-theme] {
-                /* === 重置 body 背景，清除浅色模式渐变 === */
+                /* === 重置 body 背景为深色纯色 === */
                 background-image: none !important;
                 background-size: auto !important;
                 animation: none !important;
@@ -125,11 +105,6 @@
         ._245c867 {
             background-color: transparent !important;
             background: transparent !important;
-        }
-
-        /* 深色模式下隐藏渐变背景 */
-        body[data-ds-dark-theme]::before {
-            display: none !important;
         }
 
             /* 侧边栏背景同步 */
