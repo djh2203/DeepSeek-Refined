@@ -1,6 +1,6 @@
 <h1 align="center">DeepSeek-Refined</h1>
 <p align="center">
-  <strong>一个 Tampermonkey 用户脚本，为网页版 DeepSeek注入 Obsidian Border 主题风格的 Markdown 美化样式。通过覆盖 DeepSeek 的 CSS，实现深色/浅色模式的全面配色定制。支持粗体、斜体、行内代码、数学公式的颜色自定义；各级标题左侧添加彩色圆角竖条装饰；引用块使用 Border 标志性的点阵图案背景。同时调整消息宽度为 75% 以获得更好的阅读体验。安装后自动跟随系统深浅色模式切换。</strong>
+  <strong>一个 Tampermonkey 用户脚本，为网页版 DeepSeek注入 Obsidian Border 主题风格的 Markdown 美化样式。通过覆盖 DeepSeek 的 CSS，实现深色/浅色模式的全面配色定制。内置 5 套主题（Border / Nord / Twilight / GitHub / Atom One），点击页面右上角的调色板按钮即可一键切换，选择会自动记住。支持粗体、斜体、行内代码、数学公式的颜色自定义；各级标题左侧添加彩色圆角竖条装饰；引用块使用 Border 标志性的点阵图案背景。同时调整消息宽度为 75% 以获得更好的阅读体验。安装后自动跟随系统深浅色模式切换。</strong>
 </p>
 <p align="center">
   <img src="https://img.shields.io/github/stars/djh2203/DeepSeek-Refined?style=flat-square&logo=github" alt="stars" />
@@ -16,14 +16,26 @@
 
 ## 功能特性
 
-### 全局配色
+### 主题切换
+
+内置 5 套主题，点击页面右上角的调色板按钮即可切换，选择会自动记住（`localStorage`），刷新后保持；按 `Esc` 或点击页面其他区域可关闭菜单：
+
+| 主题 | 浅色背景 | 深色背景 | 风格 |
+| -- | -- | -- | -- |
+| **Border**（默认） | `#F9F6F4` | `#27282e` | Obsidian Border 柔和配色 |
+| **Nord** | `#ECEFF4` | `#2E3440` | 北欧极光，低饱和蓝灰，护眼 |
+| **Twilight** | `#F7F3FB` | `#1A1124` | 紫色系，深色适合深夜 |
+| **GitHub** | `#FFFFFF` | `#0D1117` | GitHub 官方 Light/Dark |
+| **Atom One** | `#FAFAFA` | `#282C34` | Atom 编辑器经典配色 |
+
+### 全局配色（默认主题 Border）
 
 - 深色模式背景: ![#27282e](https://placehold.co/12x12/27282e/27282e.png) `#27282e`
 - 浅色模式背景: ![#F9F6F4](https://placehold.co/12x12/f9f6f4/f9f6f4.png) 纯色 `#F9F6F4`
 - 文字颜色采用 Border 主题的柔和灰度配色
 - 支持深色/浅色模式自动切换
 
-### Markdown 元素美化
+### Markdown 元素美化（默认主题 Border）
 
 | 元素          | 深色模式                                                               | 浅色模式                                                                                   |
 | ----------- | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
@@ -32,7 +44,7 @@
 | 行内代码        | ![#f2b6de](https://placehold.co/12x12/f2b6de/f2b6de.png) `#f2b6de` | ![#dd1399](https://placehold.co/12x12/dd1399/dd1399.png) `#dd1399`                     |
 | 数学公式        | ![#8dd3f6](https://placehold.co/12x12/8dd3f6/8dd3f6.png) `#8dd3f6` |![#1a6fb5](https://placehold.co/12x12/1a6fb5/1a6fb5.png) `#1a6fb5`                     |
 
-### 标题样式
+### 标题样式（默认主题 Border）
 
 各级标题左侧带有彩色圆角竖条:
 
@@ -90,68 +102,41 @@
 
 ## 自定义修改
 
-> 所有修改都在 `main.js` 顶部的 `<style>` 标签内进行。改完后保存脚本并刷新 DeepSeek 页面即可生效。
+> 所有配色都定义在 `main.js` 顶部的 `THEMES` 对象中，改完保存脚本并刷新 DeepSeek 页面即可生效。
 
-### 修改深色模式背景色
+### 修改某个主题的颜色
 
-```css
-body[data-ds-dark-theme] {
-    --dsw-alias-bg-base: #27282e;   /* 改为你的颜色，如 #1e1e2e */
-}
+在 `THEMES` 里找到对应主题的 `light` / `dark` 对象，直接改字段值即可。例如把 Border 深色模式的粗体改成绿色：
+
+```js
+'Border': {
+    dark: {
+        strong: '#ff7881',   // 改为 '#98c379'
+        // ...
+    },
+},
 ```
 
-若侧边栏也需同步，同时修改下方硬编码的背景色：
+各字段含义已写在代码注释中，例如：`strong` = 粗体颜色、`em` = 斜体颜色、`math` = 数学公式颜色、`heading` = 标题竖条颜色数组（顺序 `[h1, h2, h3, h4, h5, h6]`）。
 
-```css
-body[data-ds-dark-theme] ._189b4a0,
-body[data-ds-dark-theme] ._6ffc3c9 {
-    background-color: #27282e;      /* 与上面保持一致 */
-}
+### 新增一套主题
+
+复制任意一个主题对象，改名并调整颜色，加到 `THEMES` 对象中即可。之后右上角切换按钮会自动出现该主题：
+
+```js
+'My Theme': {
+    light: {
+        // 参考现有主题的 light 字段
+    },
+    dark: {
+        // 参考现有主题的 dark 字段
+    },
+},
 ```
-
-### 修改浅色模式背景色
-
-浅色背景是 `body` 上的纯色，只需改 `background-color` 一处：
-
-```css
-body {
-    background-color: #F9F6F4;      /* 改为你的颜色 */
-}
-```
-
-若希望根容器同步，下方 `background: inherit` 会自动跟随，无需额外改动。
-
-### 修改 Markdown 元素颜色
-
-| 元素 | 深色模式 | 浅色模式 |
-| -- | -- | -- |
-| 粗体 | `body[data-ds-dark-theme] .ds-markdown strong` | `body .ds-markdown strong` |
-| 斜体 | `body[data-ds-dark-theme] .ds-markdown em` | `body .ds-markdown em` |
-| 行内代码 | `.ds-markdown code:not(pre code):not(.md-code-block code)` | 同上，前面加 `body:not([data-ds-dark-theme])` |
-| 数学公式 | `body[data-ds-dark-theme] .ds-markdown-math` | `body:not([data-ds-dark-theme]) .ds-markdown-math` |
-
-例如把深色模式粗体改成绿色：
-
-```css
-body[data-ds-dark-theme] .ds-markdown strong {
-    color: #98c379 !important;
-}
-```
-
-> 数学公式选择器较长（包含 `.katex` 及其子元素），直接修改对应块的 `color` 值即可。
-
-### 修改标题竖条颜色
-
-```css
-/* 深色模式 H1 */
-body[data-ds-dark-theme] .ds-markdown h1::before {
-    background: #d18989;            /* 改为你的颜色 */
-}
-```
-
-`h2` ~ `h6` 同理，浅色模式去掉 `[data-ds-dark-theme]` 前缀即可。
 
 ### 修改消息宽度
+
+定义在 `buildCSS()` 函数中：
 
 ```css
 @media (min-width: 768px) {
