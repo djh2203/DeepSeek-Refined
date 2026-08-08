@@ -15,8 +15,64 @@
     if (window.__deepseek_refined_initialized) return;
     window.__deepseek_refined_initialized = true;
 
-    const style = document.createElement('style');
-    style.textContent = `
+    // ========== 主题调色板 ==========
+    const THEMES = {
+        'Border': {
+            light: {
+                bg: '#F9F6F4',
+                bgBase: '#F9F6F400',
+                bgLayer2: '#F2E0E4',
+                bgLayer3: '#EBE4F0',
+                labelPrimary: '#4A4348',
+                labelSecondary: '#8B7F88',
+                labelTertiary: '#A9A0A6',
+                labelCaption: '#8B7F88',
+                brandPrimary: '#793f82',
+                brandText: '#9B7AA0',
+                borderL1: 'rgba(74, 67, 72, 0.06)',
+                borderL2: 'rgba(74, 67, 72, 0.10)',
+                borderL3: 'rgba(74, 67, 72, 0.14)',
+                inlineCodeBg: '#F2E0E4',
+                codeBlockBg: '#FEFBF5',
+                codeBannerBg: '#F7F0E3',
+                strong: 'hsl(350, 80%, 55%)',
+                em: 'hsl(28, 80%, 50%)',
+                math: '#1a6fb5',
+                inlineCodeText: '#dd1399',
+                heading: ['#bd5151', '#c77b23', '#478f14', '#0585a8', '#726293', '#127d52'],
+                blockquoteDot: '000000',
+                toastBg: '#fff',
+                toastText: '#333',
+            },
+            dark: {
+                bg: '#27282e',
+                bgBase: '#27282e',
+                bgLayer1: '#27282e',
+                bgLayer2: '#2d2e34',
+                bgLayer3: '#32333a',
+                labelPrimary: 'hsl(232, 6%, 88%)',
+                labelSecondary: 'hsl(232, 9%, 64%)',
+                labelTertiary: 'hsl(232, 12%, 48%)',
+                labelCaption: 'hsl(232, 9%, 56%)',
+                brandPrimary: 'hsl(232, 70%, 65%)',
+                brandText: 'hsl(232, 70%, 70%)',
+                strong: '#ff7881',
+                em: '#fbbb83',
+                math: '#8dd3f6',
+                inlineCodeText: '#f2b6de',
+                heading: ['#d18989', '#cea38d', '#93c89c', '#7eb8f1', '#bab3ef', '#7ec8c5'],
+                blockquoteDot: 'ffffff',
+                toastBg: '#2d2e34',
+                toastText: '#e0e0e0',
+            },
+        },
+    };
+
+    // ========== 由调色板生成 CSS ==========
+    function buildCSS(theme) {
+        const L = theme.light;
+        const D = theme.dark;
+        return `
             /* 仅在宽屏下收窄消息宽度，手机端保持原样 */
             @media (min-width: 768px) {
                 :root {
@@ -28,31 +84,31 @@
                 max-width: 70%;
             }
 
-            /* ========== 浅色模式 - 晨光花园 ========== */
+            /* ========== 浅色模式 - Border 配色 ========== */
             body {
-                --dsw-alias-bg-base: #F9F6F400;
-                --dsw-alias-bg-layer-1: #F9F6F400;
-                --dsw-alias-bg-layer-2: #F2E0E4;
-                --dsw-alias-bg-layer-3: #EBE4F0;
+                --dsw-alias-bg-base: ${L.bgBase};
+                --dsw-alias-bg-layer-1: ${L.bgBase};
+                --dsw-alias-bg-layer-2: ${L.bgLayer2};
+                --dsw-alias-bg-layer-3: ${L.bgLayer3};
 
-                --dsw-alias-label-primary: #4A4348;
-                --dsw-alias-label-secondary: #8B7F88;
-                --dsw-alias-label-tertiary: #A9A0A6;
-                --dsw-alias-label-caption: #8B7F88;
+                --dsw-alias-label-primary: ${L.labelPrimary};
+                --dsw-alias-label-secondary: ${L.labelSecondary};
+                --dsw-alias-label-tertiary: ${L.labelTertiary};
+                --dsw-alias-label-caption: ${L.labelCaption};
 
-                --dsw-alias-brand-primary: #793f82ff;
-                --dsw-alias-brand-text: #9B7AA0;
+                --dsw-alias-brand-primary: ${L.brandPrimary};
+                --dsw-alias-brand-text: ${L.brandText};
 
-                --dsw-alias-border-l1: rgba(74, 67, 72, 0.06);
-                --dsw-alias-border-l2: rgba(74, 67, 72, 0.10);
-                --dsw-alias-border-l3: rgba(74, 67, 72, 0.14);
+                --dsw-alias-border-l1: ${L.borderL1};
+                --dsw-alias-border-l2: ${L.borderL2};
+                --dsw-alias-border-l3: ${L.borderL3};
 
-                --dsw-alias-markdown-inline-code: #F2E0E4;
-                --dsw-alias-markdown-code-block: #FEFBF5;
-                --dsw-alias-markdown-code-block-banner: #F7F0E3;
+                --dsw-alias-markdown-inline-code: ${L.inlineCodeBg};
+                --dsw-alias-markdown-code-block: ${L.codeBlockBg};
+                --dsw-alias-markdown-code-block-banner: ${L.codeBannerBg};
 
                 /* 浅色模式纯色背景 */
-                background-color: #F9F6F4;
+                background-color: ${L.bg};
             }
 
             /* 确保纯色背景覆盖根容器 */
@@ -68,20 +124,20 @@
                 background-image: none !important;
                 background-size: auto !important;
                 animation: none !important;
-                background-color: #27282e !important;
+                background-color: ${D.bg} !important;
 
-                --dsw-alias-bg-base: #27282e;
-                --dsw-alias-bg-layer-1: #27282e;
-                --dsw-alias-bg-layer-2: #2d2e34;
-                --dsw-alias-bg-layer-3: #32333a;
+                --dsw-alias-bg-base: ${D.bgBase};
+                --dsw-alias-bg-layer-1: ${D.bgLayer1};
+                --dsw-alias-bg-layer-2: ${D.bgLayer2};
+                --dsw-alias-bg-layer-3: ${D.bgLayer3};
 
-                --dsw-alias-label-primary: hsl(232, 6%, 88%);
-                --dsw-alias-label-secondary: hsl(232, 9%, 64%);
-                --dsw-alias-label-tertiary: hsl(232, 12%, 48%);
-                --dsw-alias-label-caption: hsl(232, 9%, 56%);
+                --dsw-alias-label-primary: ${D.labelPrimary};
+                --dsw-alias-label-secondary: ${D.labelSecondary};
+                --dsw-alias-label-tertiary: ${D.labelTertiary};
+                --dsw-alias-label-caption: ${D.labelCaption};
 
-                --dsw-alias-brand-primary: hsl(232, 70%, 65%);
-                --dsw-alias-brand-text: hsl(232, 70%, 70%);
+                --dsw-alias-brand-primary: ${D.brandPrimary};
+                --dsw-alias-brand-text: ${D.brandText};
             }
             /* 侧边栏和输入区域透明化 */
             .b8812f16,
@@ -110,23 +166,23 @@
             /* 侧边栏背景同步 */
             body[data-ds-dark-theme] ._189b4a0,
             body[data-ds-dark-theme] ._6ffc3c9 {
-                background-color: #27282e;
+                background-color: ${D.bg};
             }
 
         /* 深色模式下强调文字颜色 */
             body[data-ds-dark-theme] .ds-markdown strong {
-                color: #ff7881 !important;
+                color: ${D.strong} !important;
             }
             body[data-ds-dark-theme] .ds-markdown em {
-                color: #fbbb83 !important;
+                color: ${D.em} !important;
             }
 
         /* 浅色模式下强调文字颜色 */
             body .ds-markdown strong {
-            color: hsl(350, 80%, 55%) !important;
+            color: ${L.strong} !important;
             }
             body .ds-markdown em {
-            color: hsl(28, 80%, 50%) !important;
+            color: ${L.em} !important;
             }
 
             /* 数学公式颜色 - 深色模式 */
@@ -147,7 +203,7 @@
             body[data-ds-dark-theme] .katex .minner,
             body[data-ds-dark-theme] .math-inline,
             body[data-ds-dark-theme] .math-block {
-                color: #8dd3f6 !important;
+                color: ${D.math} !important;
             }
 
             /* 数学公式颜色 - 浅色模式 */
@@ -156,15 +212,15 @@
             body:not([data-ds-dark-theme]) .katex *,
             body:not([data-ds-dark-theme]) .math-inline,
             body:not([data-ds-dark-theme]) .math-block {
-                color: #1a6fb5 !important;
+                color: ${L.math} !important;
             }
 
             /* 行内代码颜色 */
-            .ds-markdown code:not(pre code):not(.md-code-block code) {
-            color: #f2b6de !important;
+            body .ds-markdown code:not(pre code):not(.md-code-block code) {
+            color: ${L.inlineCodeText} !important;
             }
-            body:not([data-ds-dark-theme]) .ds-markdown code:not(pre code):not(.md-code-block code) {
-            color: #dd1399 !important;
+            body[data-ds-dark-theme] .ds-markdown code:not(pre code):not(.md-code-block code) {
+            color: ${D.inlineCodeText} !important;
             }
 
             /* 标题左侧竖条 */
@@ -186,30 +242,30 @@
             }
 
             /* 深色模式标题竖条颜色 */
-            body[data-ds-dark-theme] .ds-markdown h1::before { background: #d18989; }
-            body[data-ds-dark-theme] .ds-markdown h2::before { background: #cea38d; }
-            body[data-ds-dark-theme] .ds-markdown h3::before { background: #93c89c; }
-            body[data-ds-dark-theme] .ds-markdown h4::before { background: #7eb8f1; }
-            body[data-ds-dark-theme] .ds-markdown h5::before { background: #bab3ef; }
-            body[data-ds-dark-theme] .ds-markdown h6::before { background: #7ec8c5; }
+            body[data-ds-dark-theme] .ds-markdown h1::before { background: ${D.heading[0]}; }
+            body[data-ds-dark-theme] .ds-markdown h2::before { background: ${D.heading[1]}; }
+            body[data-ds-dark-theme] .ds-markdown h3::before { background: ${D.heading[2]}; }
+            body[data-ds-dark-theme] .ds-markdown h4::before { background: ${D.heading[3]}; }
+            body[data-ds-dark-theme] .ds-markdown h5::before { background: ${D.heading[4]}; }
+            body[data-ds-dark-theme] .ds-markdown h6::before { background: ${D.heading[5]}; }
 
         /* 浅色模式标题竖条颜色 */
-        body .ds-markdown h1::before { background: #bd5151; }
-        body .ds-markdown h2::before { background: #c77b23; }
-        body .ds-markdown h3::before { background: #478f14; }
-        body .ds-markdown h4::before { background: #0585a8; }
-        body .ds-markdown h5::before { background: #726293; }
-        body .ds-markdown h6::before { background: #127d52; }
+        body .ds-markdown h1::before { background: ${L.heading[0]}; }
+        body .ds-markdown h2::before { background: ${L.heading[1]}; }
+        body .ds-markdown h3::before { background: ${L.heading[2]}; }
+        body .ds-markdown h4::before { background: ${L.heading[3]}; }
+        body .ds-markdown h5::before { background: ${L.heading[4]}; }
+        body .ds-markdown h6::before { background: ${L.heading[5]}; }
 
         /* 引用块样式 - Border 风格 */
             .ds-markdown blockquote {
                 border-left: none !important;
                 border-radius: 6px;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4' viewBox='0 0 4 4'%3E%3Cpath fill='%23000000' fill-opacity='0.12' d='M1 3h1v1H1V3zm2-2h1v1H3V1z'%3E%3C/path%3E%3C/svg%3E");
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4' viewBox='0 0 4 4'%3E%3Cpath fill='%23${L.blockquoteDot}' fill-opacity='0.12' d='M1 3h1v1H1V3zm2-2h1v1H3V1z'%3E%3C/path%3E%3C/svg%3E");
                 position: relative;
             }
             body[data-ds-dark-theme] .ds-markdown blockquote {
-                background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4' viewBox='0 0 4 4'%3E%3Cpath fill='%23ffffff' fill-opacity='0.12' d='M1 3h1v1H1V3zm2-2h1v1H3V1z'%3E%3C/path%3E%3C/svg%3E");
+                background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4' viewBox='0 0 4 4'%3E%3Cpath fill='%23${D.blockquoteDot}' fill-opacity='0.12' d='M1 3h1v1H1V3zm2-2h1v1H3V1z'%3E%3C/path%3E%3C/svg%3E");
             }
             .ds-markdown blockquote blockquote {
                 background-image: none !important;
@@ -236,7 +292,7 @@
                 top: 16px;
                 left: 50%;
                 transform: translateX(-50%) translateY(-20px);
-                background: #fff;
+                background: ${L.toastBg};
                 border-radius: 8px;
                 padding: 12px 20px;
                 box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
@@ -248,7 +304,7 @@
                 transition: all 0.3s ease;
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
                 font-size: 14px;
-                color: #333;
+                color: ${L.toastText};
             }
             .ds-copy-toast.show {
                 opacity: 1;
@@ -276,11 +332,15 @@
 
             /* 深色模式 Toast */
             body[data-ds-dark-theme] .ds-copy-toast {
-                background: #2d2e34;
-                color: #e0e0e0;
+                background: ${D.toastBg};
+                color: ${D.toastText};
                 box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
             }
         `;
+    }
+
+    const style = document.createElement('style');
+    style.textContent = buildCSS(THEMES['Border']);
     document.head.appendChild(style);
 
     // ========== 行内代码点击复制功能 ==========
