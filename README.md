@@ -68,7 +68,7 @@
 
 ## DSH 移植版
 
-本项目的主题系统与 Markdown 美化同样适用于 [DeepSeek Harness](https://github.com/deepseek-ai/DeepSeek-Harness) 前端 —— 移植为动态 Cordis 插件，无需 Tampermonkey。见 [`dsh-refined/`](dsh-refined/) 目录。
+本项目的主题系统与 Markdown 美化同样适用于 [DeepSeek Harness](https://github.com/deepseek-ai/DeepSeek-Harness) 前端 —— 移植为动态 Cordis 插件，无需 Tampermonkey。移植版已拆分为独立项目 **dsh-refined**（本地 `~/repositories/dsh-refined`，发布后此处补充链接）。
 
 ## 安装方法
 
