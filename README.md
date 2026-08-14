@@ -66,6 +66,10 @@
 
 - **行内代码点击复制**: 点击任意行内代码（如 `code`）即可自动复制到剪贴板，并显示优雅的 Toast 提示
 
+## DSH 移植版
+
+本项目的主题系统与 Markdown 美化同样适用于 [DeepSeek Harness](https://github.com/deepseek-ai/DeepSeek-Harness) 前端 —— 移植为动态 Cordis 插件，无需 Tampermonkey。见 [`dsh-refined/`](dsh-refined/) 目录。
+
 ## 安装方法
 
 ### 方式一：Greasy Fork 安装（推荐）
