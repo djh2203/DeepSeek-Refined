@@ -1,12 +1,14 @@
 // ==UserScript==
 // @name         DeepSeek-Refined
 // @namespace    https://github.com/djh2203/DeepSeek-Refined
-// @version      1.6
-// @description  一个 Tampermonkey 用户脚本，为网页版 DeepSeek Chat (chat.deepseek.com) 注入 Obsidian Border 主题风格的 Markdown 美化样式。通过覆盖 DeepSeek 的 CSS 变量系统，实现深色/浅色模式的全面配色定制。支持粗体、斜体、行内代码、数学公式的颜色自定义；各级标题左侧添加彩色圆角竖条装饰；引用块使用 Border 标志性的点阵图案背景。同时调整消息宽度为 75% 以获得更好的阅读体验。安装后自动跟随系统深浅色模式切换，无需手动配置。配色灵感来源于 Obsidian Border 主题。
+// @version      1.7
+// @description  一个 Tampermonkey 用户脚本，为网页版 DeepSeek Chat (chat.deepseek.com) 注入 Obsidian Border 主题风格的 Markdown 美化样式。通过覆盖 DeepSeek 的 CSS 变量系统，实现深色/浅色模式的全面配色定制。支持粗体、斜体、行内代码、数学公式的颜色自定义；各级标题左侧添加彩色圆角竖条装饰；引用块使用 Border 标志性的点阵图案背景。同时调整消息宽度为 75% 以获得更好的阅读体验。安装后自动跟随系统深浅色模式切换，无需手动配置。配色灵感来源于 Obsidian Border 主题。额外提供文字替换功能：点击右上角 ✎ 按钮可为页面文字配置替换规则，支持一个词对应多个替换词（随机生效）。
 // @author       djh2203
 // @match        https://chat.deepseek.com/*
 // @icon         https://www.deepseek.com/favicon.ico
 // @grant        none
+// @downloadURL https://update.greasyfork.org/scripts/585012/DeepSeek-Refined.user.js
+// @updateURL https://update.greasyfork.org/scripts/585012/DeepSeek-Refined.meta.js
 // ==/UserScript==
 
 (function () {
@@ -795,4 +797,621 @@
             });
         }
     }, true);
+
+    // ========== 文字替换功能 ==========
+    (function installTextReplacer() {
+        'use strict';
+
+        const RULES_KEY = 'dsr_text_replace_rules';
+        const CFG_KEY = 'dsr_text_replace_config';
+        const DEFAULT_CFG = { enabled: true, onlySpan: true, useRegex: false };
+
+        // ---------- 存储 ----------
+        function loadRules() {
+            try {
+                const arr = JSON.parse(localStorage.getItem(RULES_KEY));
+                if (!Array.isArray(arr)) return [];
+                // 兼容旧格式：to 为字符串时规范化为数组
+                return arr.map((r) => {
+                    if (r && typeof r === 'object' && typeof r.from === 'string') {
+                        if (typeof r.to === 'string') r.to = [r.to];
+                        if (!Array.isArray(r.to)) r.to = [];
+                    }
+                    return r;
+                });
+            } catch (e) { return []; }
+        }
+        function saveRules(rules) {
+            try { localStorage.setItem(RULES_KEY, JSON.stringify(rules)); } catch (e) { /* ignore */ }
+        }
+        function loadCfg() {
+            try {
+                const c = JSON.parse(localStorage.getItem(CFG_KEY));
+                return Object.assign({}, DEFAULT_CFG, c || {});
+            } catch (e) { return Object.assign({}, DEFAULT_CFG); }
+        }
+        function saveCfg(cfg) {
+            try { localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); } catch (e) { /* ignore */ }
+        }
+
+        // ---------- 替换逻辑 ----------
+        // 需要排除的区域：脚本自身 UI、输入框、代码区等
+        function isExcluded(el) {
+            if (!el) return true;
+            if (typeof el.closest === 'function') {
+                // 本脚本自己的 UI：文字替换面板、主题选择器、复制提示
+                if (el.closest('.dsr-replacer, .dsr-theme-picker, .ds-copy-toast')) return true;
+                if (el.closest('script,style,noscript,textarea,input,select,option')) return true;
+                const ce = el.closest('[contenteditable]');
+                if (ce && (ce.getAttribute('contenteditable') || '').toLowerCase() === 'true') return true;
+            }
+            return false;
+        }
+
+        function applyRulesToTextNode(node, rules, cfg) {
+            if (!node || node.nodeType !== Node.TEXT_NODE) return;
+            let text = node.nodeValue;
+            if (!text) return;
+            let changed = false;
+            for (const rule of rules) {
+                if (!rule || !rule.from) continue;
+                // 多个替换词：每个匹配位置随机选一个
+                const tos = (Array.isArray(rule.to) ? rule.to : [rule.to]).filter((t) => t != null);
+                if (!tos.length) continue;
+                const pick = () => tos.length === 1 ? tos[0] : tos[Math.floor(Math.random() * tos.length)];
+                try {
+                    let next;
+                    if (cfg.useRegex) {
+                        next = text.replace(new RegExp(rule.from, 'g'), () => pick());
+                    } else {
+                        next = text.split(rule.from).map((part, i, arr) => i === arr.length - 1 ? part : part + pick()).join('');
+                    }
+                    if (next !== text) { text = next; changed = true; }
+                } catch (e) { /* 非法正则等，跳过该规则 */ }
+            }
+            if (changed) node.nodeValue = text;
+        }
+
+        function walkRoot(root) {
+            if (!root) return;
+            const cfg = loadCfg();
+            const rules = loadRules().filter((r) => r && r.from && !r.disabled);
+            if (!cfg.enabled || rules.length === 0) return;
+
+            // 文本节点直接处理
+            if (root.nodeType === Node.TEXT_NODE) {
+                const parent = root.parentElement;
+                if (parent && !isExcluded(parent) && (!cfg.onlySpan || parent.tagName === 'SPAN')) {
+                    applyRulesToTextNode(root, rules, cfg);
+                }
+                return;
+            }
+            if (root.nodeType !== Node.ELEMENT_NODE) return;
+            if (isExcluded(root)) return;
+
+            const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+                acceptNode(node) {
+                    const p = node.parentElement;
+                    if (!p || isExcluded(p)) return NodeFilter.FILTER_REJECT;
+                    if (cfg.onlySpan && p.tagName !== 'SPAN') return NodeFilter.FILTER_REJECT;
+                    return NodeFilter.FILTER_ACCEPT;
+                }
+            });
+            const nodes = [];
+            while (walker.nextNode()) nodes.push(walker.currentNode);
+            nodes.forEach((n) => applyRulesToTextNode(n, rules, cfg));
+        }
+
+        // ---------- 监听 DOM 变化（DeepSeek 是动态渲染，消息会不断更新） ----------
+        let applying = false;
+        const pending = new Set();
+        let queued = false;
+
+        function flush() {
+            queued = false;
+            if (applying || pending.size === 0) return;
+            applying = true;
+            try {
+                const items = Array.from(pending);
+                pending.clear();
+                items.forEach(walkRoot);
+            } finally {
+                applying = false;
+            }
+        }
+        function scheduleFlush() {
+            if (queued) return;
+            queued = true;
+            // 用微任务调度：在浏览器绘制该帧之前完成替换，避免官方文字闪现
+            Promise.resolve().then(flush);
+        }
+
+        const mo = new MutationObserver((records) => {
+            let needs = false;
+            for (const r of records) {
+                if (r.type === 'characterData') {
+                    pending.add(r.target);
+                    needs = true;
+                } else if (r.type === 'childList') {
+                    r.addedNodes.forEach((n) => { pending.add(n); needs = true; });
+                }
+            }
+            if (needs) scheduleFlush();
+        });
+
+        // ---------- 样式 ----------
+        const style = document.createElement('style');
+        style.textContent = `
+            .dsr-replacer-btn {
+                position: fixed;
+                top: var(--dsr-btn-top, 58px);
+                right: var(--dsr-btn-right, 14px);
+                width: 36px; height: 36px; border-radius: 50%;
+                border: 1px solid var(--dsw-alias-border-l2, rgba(0,0,0,.12));
+                background: var(--dsw-alias-bg-layer-3, #ffffff);
+                color: var(--dsw-alias-brand-primary, #793f82);
+                cursor: pointer; display: flex; align-items: center; justify-content: center;
+                box-shadow: 0 2px 10px rgba(0,0,0,.2);
+                z-index: 2147483000; transition: transform .15s ease;
+            }
+            .dsr-replacer-btn:hover { transform: scale(1.08); }
+            .dsr-replacer-btn svg { width: 18px; height: 18px; }
+            .dsr-replacer-tip {
+                position: fixed;
+                right: var(--dsr-btn-right, 14px);
+                top: calc(var(--dsr-btn-top, 58px) + 44px);
+                max-width: 220px; padding: 8px 12px;
+                background: var(--dsw-alias-bg-layer-3, #ffffff);
+                color: var(--dsw-alias-label-primary, #333);
+                border: 1px solid var(--dsw-alias-border-l3, rgba(0,0,0,.14));
+                border-radius: 10px; box-shadow: 0 6px 20px rgba(0,0,0,.2);
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                font-size: 12px; line-height: 1.5; text-align: center;
+                z-index: 2147483000; pointer-events: none;
+                animation: dsr-tip-fade 8s forwards;
+            }
+            @keyframes dsr-tip-fade {
+                0% { opacity: 0; transform: translateY(6px); }
+                5% { opacity: 1; transform: translateY(0); }
+                85% { opacity: 1; }
+                100% { opacity: 0; transform: translateY(-4px); }
+            }
+            .dsr-replacer-panel {
+                position: fixed;
+                right: var(--dsr-btn-right, 14px);
+                top: calc(var(--dsr-btn-top, 58px) + 44px);
+                width: 320px; max-height: 60vh; overflow: hidden;
+                background: var(--dsw-alias-bg-layer-3, #ffffff);
+                color: var(--dsw-alias-label-primary, #333);
+                border: 1px solid var(--dsw-alias-border-l3, rgba(0,0,0,.14));
+                border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,.2);
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                font-size: 13px; line-height: 1.5;
+                z-index: 2147483000; display: none;
+            }
+            .dsr-replacer.open .dsr-replacer-panel { display: block; }
+            .dsr-replacer-head {
+                display: flex; align-items: center; justify-content: space-between;
+                padding: 10px 14px; font-weight: 600;
+                border-bottom: 1px solid var(--dsw-alias-border-l2, rgba(0,0,0,.08));
+            }
+            .dsr-replacer-close {
+                border: none; background: transparent; color: inherit;
+                font-size: 18px; line-height: 1; cursor: pointer; padding: 0 4px;
+            }
+            .dsr-replacer-switch {
+                display: flex; align-items: center; gap: 6px;
+                padding: 6px 14px; cursor: pointer; user-select: none;
+            }
+            .dsr-replacer-switch input { accent-color: var(--dsw-alias-brand-primary, #793f82); }
+            .dsr-replacer-list {
+                padding: 6px 10px; max-height: 220px; overflow-y: auto;
+                scrollbar-width: none; -ms-overflow-style: none;
+                border-top: 1px solid var(--dsw-alias-border-l1, rgba(0,0,0,.05)); margin-top: 4px;
+            }
+            .dsr-replacer-list::-webkit-scrollbar { display: none; width: 0; height: 0; }
+            .dsr-replacer-empty { padding: 10px; text-align: center; opacity: .6; }
+            .dsr-replacer-item {
+                display: grid;
+                grid-template-columns: auto minmax(0, 1fr) auto;
+                align-items: start;
+                gap: 4px 6px;
+                padding: 6px 8px; border-radius: 8px; margin-bottom: 4px;
+                background: var(--dsw-alias-bg-layer-2, #f5f5f5);
+            }
+            .dsr-replacer-item.disabled { opacity: .5; }
+            .dsr-replacer-item .dsr-replacer-item-enable {
+                grid-column: 1; grid-row: 1 / span 2;
+                margin-top: 6px;
+            }
+            .dsr-replacer-item-from {
+                grid-column: 2; grid-row: 1;
+                min-width: 0; padding: 2px 6px; border-radius: 4px;
+                background: var(--dsw-alias-bg-base, #fff); outline: none;
+                overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+                cursor: text;
+            }
+            .dsr-replacer-item-from:focus {
+                box-shadow: 0 0 0 2px var(--dsw-alias-brand-primary, #793f82);
+                white-space: normal;
+                overflow-wrap: break-word;
+                text-overflow: clip;
+            }
+            .dsr-replacer-tos {
+                grid-column: 2; grid-row: 2;
+                display: flex; flex-direction: column; gap: 4px;
+            }
+            .dsr-replacer-to-row {
+                display: flex; align-items: center; gap: 4px;
+            }
+            .dsr-replacer-to {
+                flex: 1; min-width: 0; padding: 2px 6px; border-radius: 4px;
+                background: var(--dsw-alias-bg-base, #fff); outline: none;
+                overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+                cursor: text;
+            }
+            .dsr-replacer-to:focus {
+                box-shadow: 0 0 0 2px var(--dsw-alias-brand-primary, #793f82);
+                white-space: normal;
+                overflow-wrap: break-word;
+                text-overflow: clip;
+            }
+            .dsr-replacer-item-arrow { opacity: .6; flex-shrink: 0; font-size: 12px; }
+            .dsr-replacer-del-to {
+                border: none; background: transparent; color: inherit;
+                opacity: .5; cursor: pointer; font-size: 13px; line-height: 1;
+                flex-shrink: 0; padding: 0 3px;
+            }
+            .dsr-replacer-del-to:hover { opacity: 1; }
+            .dsr-replacer-addto {
+                align-self: flex-start;
+                border: 1px dashed var(--dsw-alias-border-l3, rgba(0,0,0,.18));
+                background: transparent; color: inherit; opacity: .7;
+                border-radius: 6px; padding: 2px 8px; cursor: pointer;
+                font-size: 12px; flex-shrink: 0;
+            }
+            .dsr-replacer-addto:hover { opacity: 1; }
+            .dsr-replacer-item-del {
+                grid-column: 3; grid-row: 1;
+                border: none; background: transparent; color: inherit;
+                opacity: .6; cursor: pointer; font-size: 14px;
+                flex-shrink: 0; padding: 0 4px;
+            }
+            .dsr-replacer-item-del:hover { opacity: 1; }
+            .dsr-replacer-add {
+                display: flex; gap: 6px; padding: 10px 14px;
+                border-top: 1px solid var(--dsw-alias-border-l2, rgba(0,0,0,.08));
+            }
+            .dsr-replacer-input {
+                flex: 1; min-width: 0; padding: 5px 8px; border-radius: 6px;
+                border: 1px solid var(--dsw-alias-border-l3, rgba(0,0,0,.16));
+                background: var(--dsw-alias-bg-base, #fff); color: inherit; font-size: 13px; outline: none;
+            }
+            .dsr-replacer-input:focus { box-shadow: 0 0 0 2px var(--dsw-alias-brand-primary, #793f82); }
+            .dsr-replacer-addbtn {
+                flex-shrink: 0; border: none; border-radius: 6px; padding: 5px 12px;
+                background: var(--dsw-alias-brand-primary, #793f82);
+                color: #fff; cursor: pointer; font-size: 13px;
+            }
+            .dsr-replacer-addbtn:hover { filter: brightness(1.1); }
+            .dsr-replacer-hint { padding: 4px 14px 10px; font-size: 12px; opacity: .6; }
+        `;
+        document.head.appendChild(style);
+
+        // ---------- 界面 ----------
+        function buildUI() {
+            if (document.querySelector('.dsr-replacer')) return;
+            const cfg = loadCfg();
+
+            const root = document.createElement('div');
+            root.className = 'dsr-replacer';
+
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'dsr-replacer-btn';
+            btn.title = '文字替换';
+            btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                root.classList.toggle('open');
+            });
+
+            const panel = document.createElement('div');
+            panel.className = 'dsr-replacer-panel';
+
+            const head = document.createElement('div');
+            head.className = 'dsr-replacer-head';
+            const title = document.createElement('span');
+            title.textContent = '文字替换';
+            const close = document.createElement('button');
+            close.type = 'button';
+            close.className = 'dsr-replacer-close';
+            close.textContent = '×';
+            close.title = '关闭';
+            close.addEventListener('click', () => root.classList.remove('open'));
+            head.append(title, close);
+            panel.appendChild(head);
+
+            [
+                { key: 'enabled', label: '启用替换' },
+                { key: 'onlySpan', label: '仅替换 span 标签内的文字' },
+                { key: 'useRegex', label: '将"原文本"视为正则表达式' },
+            ].forEach(({ key, label }) => {
+                const lab = document.createElement('label');
+                lab.className = 'dsr-replacer-switch';
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.checked = !!cfg[key];
+                cb.addEventListener('change', () => {
+                    const c = loadCfg();
+                    c[key] = cb.checked;
+                    saveCfg(c);
+                    if (document.body) walkRoot(document.body);
+                });
+                lab.append(cb, document.createTextNode(' ' + label));
+                panel.appendChild(lab);
+            });
+
+            const list = document.createElement('div');
+            list.className = 'dsr-replacer-list';
+            panel.appendChild(list);
+
+            const addRow = document.createElement('div');
+            addRow.className = 'dsr-replacer-add';
+            const fromInput = document.createElement('input');
+            fromInput.type = 'text';
+            fromInput.className = 'dsr-replacer-input';
+            fromInput.placeholder = '原文本';
+            const toInput = document.createElement('input');
+            toInput.type = 'text';
+            toInput.className = 'dsr-replacer-input';
+            toInput.placeholder = '替换为';
+            const addBtn = document.createElement('button');
+            addBtn.type = 'button';
+            addBtn.className = 'dsr-replacer-addbtn';
+            addBtn.textContent = '添加';
+            addBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const from = fromInput.value.trim();
+                if (!from) { fromInput.focus(); return; }
+                const rules = loadRules();
+                rules.push({ from: from, to: [toInput.value], disabled: false });
+                saveRules(rules);
+                fromInput.value = '';
+                toInput.value = '';
+                renderRules();
+                if (document.body) walkRoot(document.body);
+            });
+            // 在输入框里按 Enter 也可以直接添加规则
+            const addOnEnter = (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addBtn.click();
+                }
+            };
+            fromInput.addEventListener('keydown', addOnEnter);
+            toInput.addEventListener('keydown', addOnEnter);
+            addRow.append(fromInput, toInput, addBtn);
+            panel.appendChild(addRow);
+
+            const hint = document.createElement('div');
+            hint.className = 'dsr-replacer-hint';
+            hint.textContent = '提示：替换文本请勿包含原文本，避免无限循环。';
+            panel.appendChild(hint);
+
+            // 首次使用显示引导气泡
+            try {
+                if (!localStorage.getItem('dsr_text_replace_tip_shown')) {
+                    const tip = document.createElement('div');
+                    tip.className = 'dsr-replacer-tip';
+                    tip.textContent = '点击右上角主题按钮下方的 ✎ 可修改页面文字';
+                    document.body.appendChild(tip);
+                    setTimeout(() => {
+                        if (tip.parentNode) tip.remove();
+                        localStorage.setItem('dsr_text_replace_tip_shown', '1');
+                    }, 8000);
+                }
+            } catch (e) { /* ignore */ }
+
+            root.append(btn, panel);
+            document.body.appendChild(root);
+
+            // 让笔按钮跟随主题按钮（dsr-theme-btn）正下方
+            function positionBtn() {
+                if (!btn.isConnected) return;
+                const themeBtn = document.querySelector('.dsr-theme-btn');
+                if (!themeBtn) return;
+                const rect = themeBtn.getBoundingClientRect();
+                const gap = 8;
+                root.style.setProperty('--dsr-btn-right', Math.max(8, Math.round(window.innerWidth - rect.right)) + 'px');
+                root.style.setProperty('--dsr-btn-top', Math.round(rect.bottom + gap) + 'px');
+            }
+            positionBtn();
+            window.addEventListener('resize', positionBtn);
+            // 主题按钮若稍后出现（如被框架重新渲染），延迟重试
+            setTimeout(positionBtn, 500);
+            setTimeout(positionBtn, 2000);
+
+            // 主题菜单展开时，临时隐藏笔按钮，避免遮挡
+            const themePicker = document.querySelector('.dsr-theme-picker');
+            if (themePicker) {
+                const syncVisibility = () => {
+                    btn.style.visibility = themePicker.classList.contains('open') ? 'hidden' : '';
+                };
+                syncVisibility();
+                new MutationObserver(syncVisibility).observe(themePicker, {
+                    attributes: true, attributeFilter: ['class']
+                });
+            }
+
+            function renderRules() {
+                list.innerHTML = '';
+                const rules = loadRules();
+                if (rules.length === 0) {
+                    const empty = document.createElement('div');
+                    empty.className = 'dsr-replacer-empty';
+                    empty.textContent = '暂无规则，请在下方添加';
+                    list.appendChild(empty);
+                    return;
+                }
+                rules.forEach((rule, idx) => {
+                    list.appendChild(createRuleItem(rule, idx));
+                });
+            }
+
+            // 创建单个规则条目：原文本 + 多个替换词（可增删）
+            function createRuleItem(rule, idx) {
+                const item = document.createElement('div');
+                item.className = 'dsr-replacer-item' + (rule.disabled ? ' disabled' : '');
+
+                const enable = document.createElement('input');
+                enable.type = 'checkbox';
+                enable.className = 'dsr-replacer-item-enable';
+                enable.checked = !rule.disabled;
+                enable.title = '启用/禁用此规则';
+                enable.addEventListener('change', () => {
+                    const rs = loadRules();
+                    rs[idx].disabled = !enable.checked;
+                    saveRules(rs);
+                    item.classList.toggle('disabled', rs[idx].disabled);
+                    if (document.body) walkRoot(document.body);
+                });
+
+                const fromSpan = document.createElement('span');
+                fromSpan.className = 'dsr-replacer-item-from';
+                fromSpan.textContent = rule.from;
+                fromSpan.contentEditable = 'true';
+                fromSpan.spellcheck = false;
+                fromSpan.title = '点击编辑，回车保存';
+                fromSpan.addEventListener('blur', () => {
+                    const rs = loadRules();
+                    const v = fromSpan.textContent.trim();
+                    if (v) { rs[idx].from = v; saveRules(rs); if (document.body) walkRoot(document.body); }
+                    else { renderRules(); }
+                });
+                // 回车保存
+                fromSpan.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        fromSpan.blur();
+                    }
+                });
+
+                // 替换词列表（可多个，随机生效）
+                const tosWrap = document.createElement('div');
+                tosWrap.className = 'dsr-replacer-tos';
+
+                function renderTos() {
+                    tosWrap.innerHTML = '';
+                    const rs = loadRules();
+                    if (!Array.isArray(rs[idx].to)) rs[idx].to = [rs[idx].to || ''];
+                    const tos = rs[idx].to;
+                    if (tos.length === 0) tos.push('');
+                    tos.forEach((t, ti) => {
+                        const row = document.createElement('div');
+                        row.className = 'dsr-replacer-to-row';
+
+                        const arrow = document.createElement('span');
+                        arrow.className = 'dsr-replacer-item-arrow';
+                        arrow.textContent = '→';
+
+                        const toSpan = document.createElement('span');
+                        toSpan.className = 'dsr-replacer-to';
+                        toSpan.textContent = t;
+                        toSpan.contentEditable = 'true';
+                        toSpan.spellcheck = false;
+                        toSpan.title = '点击编辑，回车保存';
+                        toSpan.addEventListener('blur', () => {
+                            const r2 = loadRules();
+                            if (!Array.isArray(r2[idx].to)) r2[idx].to = [];
+                            r2[idx].to[ti] = toSpan.textContent;
+                            saveRules(r2);
+                            if (document.body) walkRoot(document.body);
+                        });
+                        toSpan.addEventListener('keydown', (e) => {
+                            if (e.key === 'Enter') {
+                                e.preventDefault();
+                                toSpan.blur();
+                            }
+                        });
+
+                        const delTo = document.createElement('button');
+                        delTo.type = 'button';
+                        delTo.className = 'dsr-replacer-del-to';
+                        delTo.textContent = '×';
+                        delTo.title = '删除这个替换词';
+                        delTo.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            const r2 = loadRules();
+                            if (!Array.isArray(r2[idx].to)) r2[idx].to = [];
+                            r2[idx].to.splice(ti, 1);
+                            if (r2[idx].to.length === 0) r2[idx].to.push('');
+                            saveRules(r2);
+                            renderTos();
+                            if (document.body) walkRoot(document.body);
+                        });
+
+                        row.append(arrow, toSpan, delTo);
+                        tosWrap.appendChild(row);
+                    });
+
+                    const addTo = document.createElement('button');
+                    addTo.type = 'button';
+                    addTo.className = 'dsr-replacer-addto';
+                    addTo.textContent = '+ 添加替换';
+                    addTo.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const r2 = loadRules();
+                        if (!Array.isArray(r2[idx].to)) r2[idx].to = [];
+                        r2[idx].to.push('');
+                        saveRules(r2);
+                        renderTos();
+                        const rows = tosWrap.querySelectorAll('.dsr-replacer-to');
+                        if (rows.length) rows[rows.length - 1].focus();
+                    });
+                    tosWrap.appendChild(addTo);
+                }
+                renderTos();
+
+                const del = document.createElement('button');
+                del.type = 'button';
+                del.className = 'dsr-replacer-item-del';
+                del.textContent = '×';
+                del.title = '删除规则';
+                del.addEventListener('click', (e) => {
+                    e.stopPropagation(); // 防止点击后列表重建导致面板误关闭
+                    const rs = loadRules();
+                    rs.splice(idx, 1);
+                    saveRules(rs);
+                    renderRules();
+                    if (document.body) walkRoot(document.body);
+                });
+
+                item.append(enable, fromSpan, tosWrap, del);
+                return item;
+            }
+            renderRules();
+
+            // 用 mousedown 判定点击外部：拖选文字时 mouseup 可能在面板外，
+            // 用 click 会误判为点击外部导致面板关闭；mousedown 在面板内按下则不会关闭
+            document.addEventListener('mousedown', (e) => {
+                if (!root.contains(e.target)) root.classList.remove('open');
+            });
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') root.classList.remove('open');
+            });
+        }
+
+        // ---------- 启动 ----------
+        function start() {
+            mo.observe(document.body, { childList: true, subtree: true, characterData: true });
+            walkRoot(document.body); // 页面现有内容立即应用
+            buildUI();
+        }
+        if (document.body) {
+            start();
+        } else {
+            document.addEventListener('DOMContentLoaded', start, { once: true });
+        }
+    })();
 })();
