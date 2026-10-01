@@ -356,6 +356,11 @@
                 --dsw-alias-markdown-code-block: ${L.codeBlockBg};
                 --dsw-alias-markdown-code-block-banner: ${L.codeBannerBg};
 
+                /* 侧边栏填充色：DeepSeek 用它绘制侧边栏底色、日期标签的 box-shadow、底部渐隐等。
+                   不覆盖的话，这些残留元素会保持 DeepSeek 原配色（深色下为 #1b1b1c，近黑），
+                   在自定义底色上就会露出一条条黑条 */
+                --dsw-specific-sidebar-fill: ${L.bg};
+
                 /* 浅色模式纯色背景 */
                 background-color: ${L.bg};
             }
@@ -387,6 +392,9 @@
 
                 --dsw-alias-brand-primary: ${D.brandPrimary};
                 --dsw-alias-brand-text: ${D.brandText};
+
+                /* 同步侧边栏填充色（含日期标签 box-shadow、日期行右侧“更多”按钮底色、底部渐隐） */
+                --dsw-specific-sidebar-fill: ${D.bg};
             }
             /* 侧边栏和输入区域背景与页面背景一致 */
             .b8812f16,
@@ -416,6 +424,14 @@
         ._245c867 {
             background-color: transparent !important;
             background: transparent !important;
+        }
+
+        /* 日期标签 .f3d18f6a 自带 box-shadow: 4px 0 0（原本用于遮住滚动内容，
+           让标签底色延伸到列表内容区右缘）。标签被透明化后，这条阴影会作为一条
+           孤立的竖条残留在每个日期右侧，颜色取自 DeepSeek 原侧边栏底色（深色下 #1b1b1c），
+           与主题背景不一致时就表现为“黑条”，这里直接去掉 */
+        .f3d18f6a {
+            box-shadow: none !important;
         }
 
             /* 侧边栏背景同步 */
