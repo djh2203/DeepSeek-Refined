@@ -76,6 +76,12 @@
 
 - **行内代码点击复制**: 点击任意行内代码（如 `code`）即可自动复制到剪贴板，并显示优雅的 Toast 提示
 
+### 文字替换
+
+- 页面右上角主题按钮下方添加了文字替换面板
+- 支持为一个「原文本」配置多个「替换词」，每次随机选择一个
+- 可以开关：仅替换中心标题内的文字（默认开启）
+
 ## DSH 移植版
 
 本项目的主题系统与 Markdown 美化同样适用于 [DeepSeek Harness](https://github.com/deepseek-ai/DeepSeek-Harness) 前端 —— 移植为动态 Cordis 插件，无需 Tampermonkey。移植版已拆分为独立项目 **dsh-refined**。
