@@ -51,7 +51,7 @@
 | H6 | ![#7ec8c5](https://placehold.co/12x12/7ec8c5/7ec8c5.png) `#7ec8c5` | ![#127d52](https://placehold.co/12x12/127d52/127d52.png) `#127d52` |
 
 >### [第三方] 文字替换
->由 [@lumia-li](https://github.com/lumia-li) 基于本脚本修改，独立维护。**本脚本未内置此功能，需前往该仓库/分支单独安装使用。**
+>由 [@lumia-li](https://github.com/lumia-li) 基于本脚本修改（已合并）
 >
 >- 仓库/分支：https://github.com/lumia-li/DeepSeek-Refined/tree/feat/text-replacer
 >- 页面右上角主题按钮下方添加文字替换面板
@@ -76,11 +76,6 @@
 
 - **行内代码点击复制**: 点击任意行内代码（如 `code`）即可自动复制到剪贴板，并显示优雅的 Toast 提示
 
-### 文字替换
-
-- 页面右上角主题按钮下方添加了文字替换面板
-- 支持为一个「原文本」配置多个「替换词」，每次随机选择一个
-- 可以开关：仅替换中心标题内的文字（默认开启）
 
 ## DSH 移植版
 
