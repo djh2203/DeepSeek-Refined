@@ -2,7 +2,7 @@
 // @name         DeepSeek-Refined
 // @namespace    https://github.com/djh2203/DeepSeek-Refined
 // @version      1.7
-// @description  一个 Tampermonkey 用户脚本，为网页版 DeepSeek Chat (chat.deepseek.com) 注入 Obsidian Border 主题风格的 Markdown 美化样式。通过覆盖 DeepSeek 的 CSS 变量系统，实现深色/浅色模式的全面配色定制。支持粗体、斜体、行内代码、数学公式的颜色自定义；各级标题左侧添加彩色圆角竖条装饰；引用块使用 Border 标志性的点阵图案背景。同时调整消息宽度为 75% 以获得更好的阅读体验。安装后自动跟随系统深浅色模式切换，无需手动配置。配色灵感来源于 Obsidian Border 主题。额外提供文字替换功能：点击右上角 ✎ 按钮可为页面文字配置替换规则，支持一个词对应多个替换词（随机生效）。
+// @description  一个 Tampermonkey 用户脚本，为网页版 DeepSeek Chat (chat.deepseek.com) 注入 Obsidian Border 主题风格的 Markdown 美化样式。通过覆盖 DeepSeek 的 CSS 变量系统，实现深色/浅色模式的全面配色定制。支持粗体、斜体、行内代码、数学公式的颜色自定义；各级标题左侧添加彩色圆角竖条装饰；引用块使用 Border 标志性的点阵图案背景。同时调整消息宽度为 75% 以获得更好的阅读体验。安装后自动跟随系统深浅色模式切换，无需手动配置。配色灵感来源于 Obsidian Border 主题。额外提供文字替换功能：点击右上角 ✎ 按钮可为页面文字配置替换规则，支持一个词对应多个替换词（随机生效）。AI 回复中的中英文括号（()、（）、[]、【】）连同括号内文字统一显示为 #9C9C9C 灰色，代码块与公式区域不受影响；该效果在主题面板底部提供「括号灰色」开关，可与其他主题自由组合开关。
 // @author       djh2203
 // @match        https://chat.deepseek.com/*
 // @icon         https://www.deepseek.com/favicon.ico
@@ -317,6 +317,22 @@
         },
     };
 
+    // AI 回复中中英文括号（小括号/中括号）的固定颜色，深浅色模式一致
+    const BRACKET_COLOR = '#9C9C9C';
+
+    // 「括号灰色」开关：与主题独立，默认开启
+    const BRACKET_GRAY_KEY = 'dsr_bracket_gray';
+
+    function isBracketGray() {
+        try {
+            const saved = localStorage.getItem(BRACKET_GRAY_KEY);
+            if (saved === null) return true;
+            return saved === '1';
+        } catch (e) {
+            return true;
+        }
+    }
+
     // ========== 由调色板生成 CSS ==========
     function buildCSS(theme) {
         const L = theme.light;
@@ -493,6 +509,13 @@
             body[data-ds-dark-theme] .ds-markdown code:not(pre code):not(.md-code-block code) {
             color: ${D.inlineCodeText} !important;
             }
+
+            /* ========== AI 回复中的中英文括号着色（()（）[]【】），可在主题面板里关闭 ========== */
+            ${isBracketGray() ? `
+            body .ds-markdown .dsr-bracket,
+            body[data-ds-dark-theme] .ds-markdown .dsr-bracket {
+                color: ${BRACKET_COLOR} !important;
+            }` : ''}
 
             /* 标题左侧竖条 */
             .ds-markdown h1, .ds-markdown h2, .ds-markdown h3,
@@ -672,6 +695,13 @@
                 font-weight: 600;
             }
             .dsr-theme-option.active .dsr-check { visibility: visible; }
+            /* 主题列表与「括号灰色」开关之间的分隔线 */
+            .dsr-theme-divider {
+                height: 1px;
+                margin: 4px 6px;
+                background: currentColor;
+                opacity: 0.12;
+            }
 
             /* 深色模式主题切换按钮 */
             body[data-ds-dark-theme] .dsr-theme-btn {
@@ -692,6 +722,9 @@
     // ========== 主题切换按钮 ==========
     const THEME_STORAGE_KEY = 'dsr_theme';
 
+    // 由括号着色模块在初始化时注入，用于切换开关后立即重算
+    let refreshBrackets = null;
+
     function getThemeName() {
         try {
             const saved = localStorage.getItem(THEME_STORAGE_KEY);
@@ -706,9 +739,20 @@
         try {
             localStorage.setItem(THEME_STORAGE_KEY, name);
         } catch (e) { /* ignore */ }
-        document.querySelectorAll('.dsr-theme-option').forEach((opt) => {
+        document.querySelectorAll('.dsr-theme-option[data-theme]').forEach((opt) => {
             opt.classList.toggle('active', opt.dataset.theme === name);
         });
+    }
+
+    // 「括号灰色」开关：可与其他主题并选，互不影响
+    function setBracketGray(enabled) {
+        try {
+            localStorage.setItem(BRACKET_GRAY_KEY, enabled ? '1' : '0');
+        } catch (e) { /* ignore */ }
+        style.textContent = buildCSS(THEMES[getThemeName()]);
+        const opt = document.querySelector('.dsr-bracket-option');
+        if (opt) opt.classList.toggle('active', enabled);
+        if (typeof refreshBrackets === 'function') refreshBrackets();
     }
 
     function createThemePicker() {
@@ -740,6 +784,24 @@
             menu.appendChild(opt);
         });
 
+        // 分隔线 + 「括号灰色」开关（与主题独立，可同时选中或都取消）
+        const divider = document.createElement('div');
+        divider.className = 'dsr-theme-divider';
+        menu.appendChild(divider);
+
+        const bracketOpt = document.createElement('div');
+        bracketOpt.className = 'dsr-theme-option dsr-bracket-option';
+        bracketOpt.title = 'AI 回复中的括号及括号内文字是否显示为 #9C9C9C';
+        bracketOpt.innerHTML = '<span>括号灰色</span><span class="dsr-check">✓</span>';
+        if (isBracketGray()) bracketOpt.classList.add('active');
+        bracketOpt.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const next = !isBracketGray();
+            setBracketGray(next);
+            // 不关闭面板，方便和主题一起切换
+        });
+        menu.appendChild(bracketOpt);
+
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
             picker.classList.toggle('open');
@@ -759,6 +821,240 @@
     style.textContent = buildCSS(THEMES[getThemeName()]);
     document.head.appendChild(style);
     createThemePicker();
+
+    // ========== AI 回复括号着色 ==========
+    // 把 .ds-markdown（AI 输出的 Markdown 区域）里成对的中英文小括号 ()、（）、
+    // 中英文中括号 []、【】连同括号内的文字一起包进 span.dsr-bracket，
+    // 由上面的 CSS 统一染成 #9C9C9C。未配对的括号只染括号本身。
+    // 代码块、行内代码、数学公式等区域不处理，避免破坏渲染与复制。
+    (function installBracketStyler() {
+        'use strict';
+
+        // 中英文小括号 + 中英文中括号
+        const BRACKET_RE = /[()（）[\]【】]/;
+        const OPENERS = { '(': ')', '（': '）', '[': ']', '【': '】' };
+        const CLOSERS = { ')': '(', '）': '（', ']': '[', '】': '【' };
+        const SKIP_SELECTOR = 'pre, code, .md-code-block, .md-code-block-banner-wrap, .katex, .katex-display, .ds-markdown-math, .math-inline, .math-block, .dsr-replacer, .ds-copy-toast, textarea, input, script, style';
+        // 以块级容器为处理单元：括号配对不跨段落 / 列表项，流式更新时也只重排一小段
+        const SCOPE_SELECTOR = 'p, li, h1, h2, h3, h4, h5, h6, blockquote, td, th, dt, dd, figcaption, .ds-markdown';
+
+        function shouldSkip(el) {
+            if (!el || typeof el.closest !== 'function') return true;
+            return el.closest(SKIP_SELECTOR) !== null;
+        }
+
+        // 处理单元：最近的块级容器
+        function findScope(el) {
+            if (!el || typeof el.closest !== 'function') return null;
+            return el.closest(SCOPE_SELECTOR);
+        }
+
+        // 收集属于该处理单元的文本节点，拼成整串方便做括号配对
+        function collect(scope) {
+            const entries = [];
+            let text = '';
+            const walker = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT, {
+                acceptNode(node) {
+                    const p = node.parentElement;
+                    if (!p || p.closest(SKIP_SELECTOR)) return NodeFilter.FILTER_REJECT;
+                    // 只处理直属本文本单元的文本，嵌套块交给它自己处理
+                    if (findScope(p) !== scope) return NodeFilter.FILTER_REJECT;
+                    return NodeFilter.FILTER_ACCEPT;
+                }
+            });
+            while (walker.nextNode()) {
+                const node = walker.currentNode;
+                const value = node.nodeValue;
+                if (!value) continue;
+                entries.push({ node: node, start: text.length, end: text.length + value.length });
+                text += value;
+            }
+            return { entries: entries, text: text };
+        }
+
+        // 括号配对：返回需要着色的区间（含括号本身），未配对的括号只标括号
+        function findRanges(text) {
+            const stack = [];
+            const ranges = [];
+            for (let i = 0; i < text.length; i++) {
+                const ch = text.charAt(i);
+                if (OPENERS[ch]) {
+                    stack.push({ ch: ch, index: i });
+                } else if (CLOSERS[ch]) {
+                    let hit = -1;
+                    for (let j = stack.length - 1; j >= 0; j--) {
+                        if (stack[j].ch === CLOSERS[ch]) { hit = j; break; }
+                    }
+                    if (hit === -1) {
+                        // 孤立的闭括号
+                        ranges.push({ start: i, end: i });
+                    } else {
+                        ranges.push({ start: stack[hit].index, end: i });
+                        stack.splice(hit, 1);
+                    }
+                }
+            }
+            // 未闭合的开括号：只给括号本身着色
+            stack.forEach((item) => ranges.push({ start: item.index, end: item.index }));
+
+            ranges.sort((a, b) => (a.start - b.start) || (b.end - a.end));
+            // 去掉被外层区间完全覆盖的内层区间
+            const flat = [];
+            let cursor = 0;
+            ranges.forEach((r) => {
+                if (r.start < cursor) return;
+                flat.push(r);
+                cursor = r.end + 1;
+            });
+            return flat;
+        }
+
+        // 把文本节点中 [start, end] 这一段包进 span.dsr-bracket
+        function wrapInNode(node, start, end) {
+            let target = node;
+            if (start > 0) target = target.splitText(start);
+            const len = end - start + 1;
+            if (len < target.nodeValue.length) target.splitText(len);
+            const parent = target.parentNode;
+            if (!parent) return;
+            const span = document.createElement('span');
+            span.className = 'dsr-bracket';
+            parent.insertBefore(span, target);
+            span.appendChild(target);
+        }
+
+        // 从右往左应用区间，保证同一文本节点内的偏移效
+        function applyRanges(entries, ranges) {
+            for (let i = ranges.length - 1; i >= 0; i--) {
+                const range = ranges[i];
+                for (let k = entries.length - 1; k >= 0; k--) {
+                    const entry = entries[k];
+                    if (entry.end <= range.start || entry.start > range.end) continue;
+                    const start = Math.max(range.start, entry.start) - entry.start;
+                    const end = Math.min(range.end, entry.end - 1) - entry.start;
+                    wrapInNode(entry.node, start, end);
+                }
+            }
+        }
+
+        // 只还原本处理单元自己生成的 span
+        function ownedSpans(scope) {
+            return Array.from(scope.querySelectorAll('.dsr-bracket')).filter((span) => {
+                return span.parentElement && findScope(span.parentElement) === scope;
+            });
+        }
+
+        function unwrapAll(scope) {
+            ownedSpans(scope).forEach((span) => {
+                if (span.isConnected) span.replaceWith(...Array.from(span.childNodes));
+            });
+        }
+
+        function processScope(scope) {
+            if (!scope || !scope.isConnected) return;
+            if (scope.closest(SKIP_SELECTOR)) return;
+            if (!scope.closest('.ds-markdown')) return;
+
+            // 开关关闭：把已有的括号 span 还原成纯文本
+            if (!isBracketGray()) {
+                if (ownedSpans(scope).length) unwrapAll(scope);
+                scope.__dsrBracketSig = '';
+                scope.__dsrBracketSpanCount = 0;
+                return;
+            }
+
+            const found = collect(scope);
+            const text = found.text;
+
+            if (!BRACKET_RE.test(text)) {
+                if (ownedSpans(scope).length) unwrapAll(scope);
+                scope.__dsrBracketSig = '';
+                scope.__dsrBracketSpanCount = 0;
+                return;
+            }
+
+            // 文字没变、包裹结构也还在 → 直接跳过，避免自己的改动反复触发自身
+            const spanCount = ownedSpans(scope).length;
+            if (scope.__dsrBracketSig === text && scope.__dsrBracketSpanCount === spanCount) return;
+
+            unwrapAll(scope);
+            const fresh = collect(scope);
+            if (!fresh.text) return;
+            applyRanges(fresh.entries, findRanges(fresh.text));
+            scope.__dsrBracketSig = fresh.text;
+            scope.__dsrBracketSpanCount = ownedSpans(scope).length;
+        }
+
+        // 开关切换后：清掉各块缓存并立即重算（关闭时会把已有 span 全部还原）
+        function refresh() {
+            document.querySelectorAll('.ds-markdown').forEach((block) => {
+                const scopes = [block].concat(Array.from(block.querySelectorAll(SCOPE_SELECTOR)));
+                scopes.forEach((scope) => {
+                    scope.__dsrBracketSig = null;
+                    scope.__dsrBracketSpanCount = -1;
+                    processScope(scope);
+                });
+            });
+        }
+        refreshBrackets = refresh;
+
+        const pending = new Set();
+        let scheduled = false;
+
+        function flush() {
+            scheduled = false;
+            const items = Array.from(pending);
+            pending.clear();
+            items.forEach(processScope);
+        }
+
+        function schedule() {
+            if (scheduled) return;
+            scheduled = true;
+            // 合并同一帧内的多次流式更新，避免每条 token 都重排 DOM
+            requestAnimationFrame(flush);
+        }
+
+        // 把发生变化的节点归到它所属的处理单元（新插入的子树则整体扫描一遍）
+        function queueScopes(node) {
+            if (!node || !node.isConnected) return;
+            const el = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+            if (!el || typeof el.closest !== 'function') return;
+            const scope = findScope(el);
+            if (scope) pending.add(scope);
+            if (node.nodeType === Node.ELEMENT_NODE && node.querySelectorAll) {
+                node.querySelectorAll(SCOPE_SELECTOR).forEach((s) => pending.add(s));
+            }
+        }
+
+        const mo = new MutationObserver((records) => {
+            let dirty = false;
+            for (const r of records) {
+                if (r.type === 'characterData') {
+                    queueScopes(r.target);
+                    dirty = true;
+                } else if (r.type === 'childList') {
+                    r.addedNodes.forEach((n) => {
+                        queueScopes(n);
+                        dirty = true;
+                    });
+                }
+            }
+            if (dirty && pending.size) schedule();
+        });
+
+        function start() {
+            queueScopes(document.body);
+            if (pending.size) flush();
+            mo.observe(document.body, { childList: true, subtree: true, characterData: true });
+        }
+
+        if (document.body) {
+            start();
+        } else {
+            document.addEventListener('DOMContentLoaded', start, { once: true });
+        }
+    })();
 
     // ========== 行内代码点击复制功能 ==========
     function showToast(message) {
