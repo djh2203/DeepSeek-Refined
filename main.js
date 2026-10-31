@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DeepSeek-Refined
 // @namespace    https://github.com/djh2203/DeepSeek-Refined
-// @version      1.7
+// @version      1.8
 // @description  一个 Tampermonkey 用户脚本，为网页版 DeepSeek Chat (chat.deepseek.com) 注入 Obsidian Border 主题风格的 Markdown 美化样式。通过覆盖 DeepSeek 的 CSS 变量系统，实现深色/浅色模式的全面配色定制。支持粗体、斜体、行内代码、数学公式的颜色自定义；各级标题左侧添加彩色圆角竖条装饰；引用块使用 Border 标志性的点阵图案背景。同时调整消息宽度为 75% 以获得更好的阅读体验。安装后自动跟随系统深浅色模式切换，无需手动配置。配色灵感来源于 Obsidian Border 主题。额外提供文字替换功能：点击右上角 ✎ 按钮可为页面文字配置替换规则，支持一个词对应多个替换词（随机生效）。AI 回复中的中英文括号（()、（）、[]、【】）连同括号内文字统一显示为 #9C9C9C 灰色，代码块与公式区域不受影响；该效果在主题面板底部提供「括号灰色」开关，可与其他主题自由组合开关。
 // @author       djh2203
 // @match        https://chat.deepseek.com/*
@@ -412,16 +412,12 @@
                 /* 同步侧边栏填充色（含日期标签 box-shadow、日期行右侧“更多”按钮底色、底部渐隐） */
                 --dsw-specific-sidebar-fill: ${D.bg};
             }
-            /* 侧边栏和输入区域背景与页面背景一致 */
-            .b8812f16,
-            ._519be07,
-            ._233f913 {
+            /* 侧边栏背景与页面背景一致 */
+            .b8812f16 {
                 background-color: ${L.bg} !important;
                 background: ${L.bg} !important;
             }
-            body[data-ds-dark-theme] .b8812f16,
-            body[data-ds-dark-theme] ._519be07,
-            body[data-ds-dark-theme] ._233f913 {
+            body[data-ds-dark-theme] .b8812f16 {
                 background-color: ${D.bg} !important;
                 background: ${D.bg} !important;
             }
@@ -449,12 +445,6 @@
         .f3d18f6a {
             box-shadow: none !important;
         }
-
-            /* 侧边栏背景同步 */
-            body[data-ds-dark-theme] ._189b4a0,
-            body[data-ds-dark-theme] ._6ffc3c9 {
-                background-color: ${D.bg};
-            }
 
         /* 深色模式下强调文字颜色 */
             body[data-ds-dark-theme] .ds-markdown strong {
@@ -512,8 +502,7 @@
 
             /* ========== AI 回复中的中英文括号着色（()（）[]【】），可在主题面板里关闭 ========== */
             ${isBracketGray() ? `
-            body .ds-markdown .dsr-bracket,
-            body[data-ds-dark-theme] .ds-markdown .dsr-bracket {
+            body .ds-markdown .dsr-bracket {
                 color: ${BRACKET_COLOR} !important;
             }` : ''}
 
@@ -838,11 +827,6 @@
         // 以块级容器为处理单元：括号配对不跨段落 / 列表项，流式更新时也只重排一小段
         const SCOPE_SELECTOR = 'p, li, h1, h2, h3, h4, h5, h6, blockquote, td, th, dt, dd, figcaption, .ds-markdown';
 
-        function shouldSkip(el) {
-            if (!el || typeof el.closest !== 'function') return true;
-            return el.closest(SKIP_SELECTOR) !== null;
-        }
-
         // 处理单元：最近的块级容器
         function findScope(el) {
             if (!el || typeof el.closest !== 'function') return null;
@@ -985,8 +969,9 @@
             scope.__dsrBracketSpanCount = ownedSpans(scope).length;
         }
 
-        // 开关切换后：清掉各块缓存并立即重算（关闭时会把已有 span 全部还原）
+        // 开关切换后：先接/断监听，再清缓存重算（关闭时会把已有 span 全部还原）
         function refresh() {
+            syncObserver();
             document.querySelectorAll('.ds-markdown').forEach((block) => {
                 const scopes = [block].concat(Array.from(block.querySelectorAll(SCOPE_SELECTOR)));
                 scopes.forEach((scope) => {
@@ -1043,10 +1028,19 @@
             if (dirty && pending.size) schedule();
         });
 
+        const MO_OPTS = { childList: true, subtree: true, characterData: true };
+
+        // 开关关闭时不监听 DOM（否则每次变动都要逐块 querySelectorAll，纯属白做功）
+        function syncObserver() {
+            if (document.body && isBracketGray()) mo.observe(document.body, MO_OPTS);
+            else mo.disconnect();
+        }
+
         function start() {
+            syncObserver();
+            if (!document.body || !isBracketGray()) return;
             queueScopes(document.body);
             if (pending.size) flush();
-            mo.observe(document.body, { childList: true, subtree: true, characterData: true });
         }
 
         if (document.body) {
@@ -1094,8 +1088,8 @@
     document.addEventListener('click', function (e) {
         const code = e.target.closest('code');
         if (code && isInlineCode(code)) {
+            // 不 stopPropagation：那会吞掉 DeepSeek 自己的点击处理
             e.preventDefault();
-            e.stopPropagation();
             navigator.clipboard.writeText(code.textContent).then(() => {
                 showToast('成功复制到剪贴板！');
             }).catch(() => {
@@ -1160,6 +1154,9 @@
             return false;
         }
 
+        // 本脚本自己写过的文本节点内容
+        const selfWrites = new WeakMap();
+
         function applyRulesToTextNode(node, rules, cfg) {
             if (!node || node.nodeType !== Node.TEXT_NODE) return;
             let text = node.nodeValue;
@@ -1181,14 +1178,24 @@
                     if (next !== text) { text = next; changed = true; }
                 } catch (e) { /* 非法正则等，跳过该规则 */ }
             }
-            if (changed) node.nodeValue = text;
+            // 记录自己的写入：MutationObserver 同样会看到它，
+            // 若替换词里含原文本就会无限自我触发（卡死页面），据此跳过自己的回声
+            if (changed) { node.nodeValue = text; selfWrites.set(node, text); }
         }
 
-        function walkRoot(root) {
-            if (!root) return;
+        // 一次解析出当前生效的配置与规则；不生效时返回 null
+        function activeRules() {
             const cfg = loadCfg();
             const rules = loadRules().filter((r) => r && r.from && !r.disabled);
-            if (!cfg.enabled || rules.length === 0) return;
+            return cfg.enabled && rules.length ? { cfg: cfg, rules: rules } : null;
+        }
+
+        function walkRoot(root, state) {
+            if (!root) return;
+            const s = state || activeRules();
+            if (!s) return;
+            const cfg = s.cfg;
+            const rules = s.rules;
 
             // 文本节点直接处理
             if (root.nodeType === Node.TEXT_NODE) {
@@ -1222,11 +1229,13 @@
         function flush() {
             queued = false;
             if (applying || pending.size === 0) return;
+            const s = activeRules();
+            if (!s) { pending.clear(); return; }
             applying = true;
             try {
                 const items = Array.from(pending);
                 pending.clear();
-                items.forEach(walkRoot);
+                items.forEach((root) => walkRoot(root, s));
             } finally {
                 applying = false;
             }
@@ -1242,6 +1251,10 @@
             let needs = false;
             for (const r of records) {
                 if (r.type === 'characterData') {
+                    if (selfWrites.get(r.target) === r.target.nodeValue) {
+                        selfWrites.delete(r.target);
+                        continue; // 自己刚写的，不再处理，避免自我循环
+                    }
                     pending.add(r.target);
                     needs = true;
                 } else if (r.type === 'childList') {
@@ -1250,6 +1263,17 @@
             }
             if (needs) scheduleFlush();
         });
+
+        // 功能关闭或没有规则时断开监听，省掉每次 DOM 变动的遍历
+        const MO_OPTS = { childList: true, subtree: true, characterData: true };
+        function syncObserver() {
+            if (document.body && activeRules()) mo.observe(document.body, MO_OPTS);
+            else mo.disconnect();
+        }
+        function refreshAll() {
+            syncObserver();
+            if (document.body) walkRoot(document.body);
+        }
 
         // ---------- 样式 ----------
         const style = document.createElement('style');
@@ -1458,7 +1482,7 @@
                     const c = loadCfg();
                     c[key] = cb.checked;
                     saveCfg(c);
-                    if (document.body) walkRoot(document.body);
+                    refreshAll();
                 });
                 lab.append(cb, document.createTextNode(' ' + label));
                 panel.appendChild(lab);
@@ -1492,7 +1516,7 @@
                 fromInput.value = '';
                 toInput.value = '';
                 renderRules();
-                if (document.body) walkRoot(document.body);
+                refreshAll();
             });
             // 在输入框里按 Enter 也可以直接添加规则
             const addOnEnter = (e) => {
@@ -1586,7 +1610,7 @@
                     rs[idx].disabled = !enable.checked;
                     saveRules(rs);
                     item.classList.toggle('disabled', rs[idx].disabled);
-                    if (document.body) walkRoot(document.body);
+                    refreshAll();
                 });
 
                 const fromSpan = document.createElement('span');
@@ -1598,7 +1622,7 @@
                 fromSpan.addEventListener('blur', () => {
                     const rs = loadRules();
                     const v = fromSpan.textContent.trim();
-                    if (v) { rs[idx].from = v; saveRules(rs); if (document.body) walkRoot(document.body); }
+                    if (v) { rs[idx].from = v; saveRules(rs); refreshAll(); }
                     else { renderRules(); }
                 });
                 // 回车保存
@@ -1638,7 +1662,7 @@
                             if (!Array.isArray(r2[idx].to)) r2[idx].to = [];
                             r2[idx].to[ti] = toSpan.textContent;
                             saveRules(r2);
-                            if (document.body) walkRoot(document.body);
+                            refreshAll();
                         });
                         toSpan.addEventListener('keydown', (e) => {
                             if (e.key === 'Enter') {
@@ -1660,7 +1684,7 @@
                             if (r2[idx].to.length === 0) r2[idx].to.push('');
                             saveRules(r2);
                             renderTos();
-                            if (document.body) walkRoot(document.body);
+                            refreshAll();
                         });
 
                         row.append(arrow, toSpan, delTo);
@@ -1696,7 +1720,7 @@
                     rs.splice(idx, 1);
                     saveRules(rs);
                     renderRules();
-                    if (document.body) walkRoot(document.body);
+                    refreshAll();
                 });
 
                 item.append(enable, fromSpan, tosWrap, del);
@@ -1716,7 +1740,7 @@
 
         // ---------- 启动 ----------
         function start() {
-            mo.observe(document.body, { childList: true, subtree: true, characterData: true });
+            syncObserver();
             walkRoot(document.body); // 页面现有内容立即应用
             buildUI();
         }

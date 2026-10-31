@@ -1,6 +1,6 @@
 <h1 align="center">DeepSeek-Refined</h1>
 <p align="center">
-  <strong>一个 Tampermonkey 用户脚本，为网页版 DeepSeek注入 Obsidian Border 主题风格的 Markdown 美化样式。通过覆盖 DeepSeek 的 CSS，实现深色/浅色模式的全面配色定制。内置 5 套主题（Border / Nord / Twilight / GitHub / Atom One），点击页面右上角的调色板按钮即可一键切换，选择会自动记住。支持粗体、斜体、行内代码、数学公式的颜色自定义；各级标题左侧添加彩色圆角竖条装饰；引用块使用 Border 标志性的点阵图案背景。同时调整消息宽度为 75% 以获得更好的阅读体验。安装后自动跟随系统深浅色模式切换。</strong>
+  <strong>一个 Tampermonkey 用户脚本，为网页版 DeepSeek注入 Obsidian Border 主题风格的 Markdown 美化样式。通过覆盖 DeepSeek 的 CSS，实现深色/浅色模式的全面配色定制。内置 5 套主题（Border / Nord / Twilight / GitHub / Atom One），点击页面右上角的调色板按钮即可一键切换，选择会自动记住。支持粗体、斜体、行内代码、数学公式的颜色自定义；各级标题左侧添加彩色圆角竖条装饰；引用块使用 Border 标志性的点阵图案背景。同时调整消息宽度为 75% 以获得更好的阅读体验。安装后自动跟随系统深浅色模式切换。AI 回复中的中英文括号及括号内文字可一键染成灰色（`#9C9C9C`），颜色不随主题变化，代码块与公式区域不受影响。</strong>
 </p>
 <p align="center">
   <img src="https://img.shields.io/github/stars/djh2203/DeepSeek-Refined?style=flat-square&logo=github" alt="stars" />
@@ -36,6 +36,12 @@
 | 斜体 (italic) | ![#fbbb83](https://placehold.co/12x12/fbbb83/fbbb83.png) `#fbbb83` | ![hsl(28,80%,50%)](https://placehold.co/12x12/e67e00/e67e00.png) `hsl(28, 80%, 50%)`   |
 | 行内代码        | ![#f2b6de](https://placehold.co/12x12/f2b6de/f2b6de.png) `#f2b6de` | ![#dd1399](https://placehold.co/12x12/dd1399/dd1399.png) `#dd1399`                     |
 | 数学公式        | ![#8dd3f6](https://placehold.co/12x12/8dd3f6/8dd3f6.png) `#8dd3f6` |![#1a6fb5](https://placehold.co/12x12/1a6fb5/1a6fb5.png) `#1a6fb5`                     |
+
+### 括号灰色
+
+AI 回复中的中英文括号（`()`、`（）`、`[]`、`【】`）连同括号内的文字统一显示为 ![#9C9C9C](https://placehold.co/12x12/9c9c9c/9c9c9c.png) `#9C9C9C`，颜色不随主题变化；代码块、行内代码与数学公式区域不受影响。
+
+在主题菜单底部的「括号灰色」开关里可以随时开关（和主题选择互相独立，选择会记住）。配对只在同一段落 / 列表项内部进行，跨段落的括号不会被配对；未配对的括号只染括号本身。
 
 ### 标题样式（默认主题 Border）
 
