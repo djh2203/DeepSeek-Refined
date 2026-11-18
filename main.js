@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DeepSeek-Refined
 // @namespace    https://github.com/djh2203/DeepSeek-Refined
-// @version      1.8
+// @version      2.0
 // @description  一个 Tampermonkey 用户脚本，为网页版 DeepSeek Chat (chat.deepseek.com) 注入 Obsidian Border 主题风格的 Markdown 美化样式。通过覆盖 DeepSeek 的 CSS 变量系统，实现深色/浅色模式的全面配色定制。支持粗体、斜体、行内代码、数学公式的颜色自定义；各级标题左侧添加彩色圆角竖条装饰；引用块使用 Border 标志性的点阵图案背景。同时调整消息宽度为 75% 以获得更好的阅读体验。安装后自动跟随系统深浅色模式切换，无需手动配置。配色灵感来源于 Obsidian Border 主题。额外提供文字替换功能：点击右上角 ✎ 按钮可为页面文字配置替换规则，支持一个词对应多个替换词（随机生效）。AI 回复中的中英文括号（()、（）、[]、【】）连同括号内文字统一显示为 #9C9C9C 灰色，代码块与公式区域不受影响；该效果在主题面板底部提供「括号灰色」开关，可与其他主题自由组合开关。
 // @author       djh2203
 // @match        https://chat.deepseek.com/*
@@ -1141,17 +1141,12 @@
         }
 
         // ---------- 替换逻辑 ----------
-        // 需要排除的区域：脚本自身 UI、输入框、代码区等
+        // 需要排除的区域：脚本自身 UI、输入框、代码/脚本、可编辑区。一次 closest 走完，不必分离多次
+        const EXCLUDE_SELECTOR = '.dsr-replacer, .dsr-theme-picker, .ds-copy-toast, script, style, noscript, textarea, input, select, option, [contenteditable="true"]';
+
         function isExcluded(el) {
             if (!el) return true;
-            if (typeof el.closest === 'function') {
-                // 本脚本自己的 UI：文字替换面板、主题选择器、复制提示
-                if (el.closest('.dsr-replacer, .dsr-theme-picker, .ds-copy-toast')) return true;
-                if (el.closest('script,style,noscript,textarea,input,select,option')) return true;
-                const ce = el.closest('[contenteditable]');
-                if (ce && (ce.getAttribute('contenteditable') || '').toLowerCase() === 'true') return true;
-            }
-            return false;
+            return typeof el.closest === 'function' && el.closest(EXCLUDE_SELECTOR) !== null;
         }
 
         // 本脚本自己写过的文本节点内容
@@ -1161,7 +1156,6 @@
             if (!node || node.nodeType !== Node.TEXT_NODE) return;
             let text = node.nodeValue;
             if (!text) return;
-            let changed = false;
             for (const rule of rules) {
                 if (!rule || !rule.from) continue;
                 // 多个替换词：每个匹配位置随机选一个
@@ -1175,12 +1169,13 @@
                     } else {
                         next = text.split(rule.from).map((part, i, arr) => i === arr.length - 1 ? part : part + pick()).join('');
                     }
-                    if (next !== text) { text = next; changed = true; }
+                    if (next !== text) text = next;
                 } catch (e) { /* 非法正则等，跳过该规则 */ }
             }
-            // 记录自己的写入：MutationObserver 同样会看到它，
-            // 若替换词里含原文本就会无限自我触发（卡死页面），据此跳过自己的回声
-            if (changed) { node.nodeValue = text; selfWrites.set(node, text); }
+            // 只有净结果真的变了才写：多条规则互相抵消时不动 DOM，省掉一次无谓的
+            // characterData 变更（MutationObserver 会看到它，还得靠 selfWrites 再挡一次）。
+            // selfWrites 用来跳过自己在 MO 里听到的回声，否则替换词含原文本会自我触发
+            if (text !== node.nodeValue) { node.nodeValue = text; selfWrites.set(node, text); }
         }
 
         // 一次解析出当前生效的配置与规则；不生效时返回 null
@@ -1222,23 +1217,17 @@
         }
 
         // ---------- 监听 DOM 变化（DeepSeek 是动态渲染，消息会不断更新） ----------
-        let applying = false;
         const pending = new Set();
         let queued = false;
 
         function flush() {
             queued = false;
-            if (applying || pending.size === 0) return;
+            if (pending.size === 0) return;
             const s = activeRules();
             if (!s) { pending.clear(); return; }
-            applying = true;
-            try {
-                const items = Array.from(pending);
-                pending.clear();
-                items.forEach((root) => walkRoot(root, s));
-            } finally {
-                applying = false;
-            }
+            const items = Array.from(pending);
+            pending.clear();
+            items.forEach((root) => walkRoot(root, s));
         }
         function scheduleFlush() {
             if (queued) return;
@@ -1292,26 +1281,6 @@
             }
             .dsr-replacer-btn:hover { transform: scale(1.08); }
             .dsr-replacer-btn svg { width: 18px; height: 18px; }
-            .dsr-replacer-tip {
-                position: fixed;
-                right: var(--dsr-btn-right, 14px);
-                top: calc(var(--dsr-btn-top, 58px) + 44px);
-                max-width: 220px; padding: 8px 12px;
-                background: var(--dsw-alias-bg-layer-3, #ffffff);
-                color: var(--dsw-alias-label-primary, #333);
-                border: 1px solid var(--dsw-alias-border-l3, rgba(0,0,0,.14));
-                border-radius: 10px; box-shadow: 0 6px 20px rgba(0,0,0,.2);
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                font-size: 12px; line-height: 1.5; text-align: center;
-                z-index: 2147483000; pointer-events: none;
-                animation: dsr-tip-fade 8s forwards;
-            }
-            @keyframes dsr-tip-fade {
-                0% { opacity: 0; transform: translateY(6px); }
-                5% { opacity: 1; transform: translateY(0); }
-                85% { opacity: 1; }
-                100% { opacity: 0; transform: translateY(-4px); }
-            }
             .dsr-replacer-panel {
                 position: fixed;
                 right: var(--dsr-btn-right, 14px);
@@ -1534,20 +1503,6 @@
             hint.className = 'dsr-replacer-hint';
             hint.textContent = '提示：替换文本请勿包含原文本，避免无限循环。';
             panel.appendChild(hint);
-
-            // 首次使用显示引导气泡
-            try {
-                if (!localStorage.getItem('dsr_text_replace_tip_shown')) {
-                    const tip = document.createElement('div');
-                    tip.className = 'dsr-replacer-tip';
-                    tip.textContent = '点击右上角主题按钮下方的 ✎ 可修改页面文字';
-                    document.body.appendChild(tip);
-                    setTimeout(() => {
-                        if (tip.parentNode) tip.remove();
-                        localStorage.setItem('dsr_text_replace_tip_shown', '1');
-                    }, 8000);
-                }
-            } catch (e) { /* ignore */ }
 
             root.append(btn, panel);
             document.body.appendChild(root);
@@ -2309,15 +2264,6 @@
                 setTimeout(tryMount, 50);
             }
         })();
-
-        // 展开面板时移除首次使用引导气泡（原写在 createThemePicker 内）
-        const themeBtn = document.querySelector('.dsr-theme-btn');
-        if (themeBtn) {
-            themeBtn.addEventListener('click', () => {
-                const tip = document.querySelector('.dsr-replacer-tip');
-                if (tip) tip.remove();
-            });
-        }
 
         rebuild();
 
