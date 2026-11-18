@@ -1750,4 +1750,590 @@
             document.addEventListener('DOMContentLoaded', start, { once: true });
         }
     })();
+
+    // ====================================================================
+    // 自定义背景图模块（自包含，与上游主题/文字替换逻辑完全解耦）
+    // --------------------------------------------------------------------
+    // 合并指南：本块是整份脚本里唯一与「背景图」有关的代码。上游脚本更新后，
+    //   只需把本块原样搬到新版本最外层 IIFE 结束前即可，无需改动任何上游函数。
+    // 设计要点：
+    //   1. 自有 <style> 元素，不复用主 style —— 主题切换不会冲掉它；
+    //   2. UI 直接挂载到已有的 .dsr-theme-menu —— 不修改 createThemePicker；
+    //   3. 面板配色一律走 CSS 变量 var(--dsw-alias-*) —— 深浅色自动跟随；
+    //   4. 垫底色沿用 body 自身的主题背景（传播到 canvas）—— 不依赖 THEMES。
+    // ====================================================================
+    (function installBackgroundImage() {
+        'use strict';
+
+        const BG_CFG_KEY = 'dsr_bg_image';
+        const BG_CFG_DEFAULT = {
+            opacity: 100,
+            blur: 0,
+            fit: 'cover',              // cover / contain / auto / tile
+            position: 'center center', // 九宫格位置
+            flipX: false,
+            flipY: false,
+        };
+
+        // 任何要拼进 CSS 的值都必须走白名单，绝不能把 localStorage 里的任意字符串直接塞进样式
+        const FIT_VALUES = ['cover', 'contain', 'auto', 'tile'];
+        const POSITION_VALUES = [
+            'left top', 'center top', 'right top',
+            'left center', 'center center', 'right center',
+            'left bottom', 'center bottom', 'right bottom',
+        ];
+        const FIT_LABELS = { cover: '裁切铺满', contain: '完整显示', auto: '原尺寸', tile: '平铺' };
+        const POS_LABELS = {
+            'left top': '左上', 'center top': '上中', 'right top': '右上',
+            'left center': '左中', 'center center': '居中', 'right center': '右中',
+            'left bottom': '左下', 'center bottom': '下中', 'right bottom': '右下',
+        };
+
+        const LEGACY_BG_KEY = 'dsr_custom_bg';   // 旧版「背景色」用过的键，仅迁移滑块值
+        const IDB_NAME = 'dsr_bg_store';
+        const IDB_STORE = 'files';
+        const IDB_KEY = 'image';
+        const BG_HAS_KEY = 'dsr_bg_has_image';
+
+        // 落盘前的体积/边长上限：IndexedDB 比 localStorage 能装，但浏览器仍可能清理，
+        // 移动端解码 4K 图也吃内存。超限就先压缩再存（见 normalizeImage）。
+        const MAX_STORE_BYTES = 12 * 1024 * 1024;
+        const MAX_EDGE = 2560;
+
+        // 当前图片的 objectURL；为空表示「没有自定义背景图，跟随主题」
+        let bgImageUrl = '';
+        // 图片异步恢复后刷新缩略图/滑块的回调，由 UI 装配时填入
+        let bgSyncUI = null;
+
+        function clampNumber(value, min, max, fallback) {
+            const n = typeof value === 'number' ? value : Number(value);
+            if (!Number.isFinite(n)) return fallback;
+            return Math.max(min, Math.min(max, n));
+        }
+
+        function pickEnum(value, allowed, fallback) {
+            return allowed.indexOf(value) !== -1 ? value : fallback;
+        }
+
+        function toBool(value) {
+            return value === true || value === 1 || value === '1' || value === 'true';
+        }
+
+        // 把任意来源的配置规整成合法值：数值夹紧、枚举走白名单、布尔归一
+        function normalizeCfg(src, fromLegacy) {
+            const obj = src || {};
+            return {
+                opacity: clampNumber(fromLegacy ? obj.alpha : obj.opacity, 0, 100, BG_CFG_DEFAULT.opacity),
+                blur: clampNumber(obj.blur, 0, 30, BG_CFG_DEFAULT.blur),
+                fit: pickEnum(obj.fit, FIT_VALUES, BG_CFG_DEFAULT.fit),
+                position: pickEnum(obj.position, POSITION_VALUES, BG_CFG_DEFAULT.position),
+                flipX: toBool(obj.flipX),
+                flipY: toBool(obj.flipY),
+            };
+        }
+
+        function getBgCfg() {
+            try {
+                const raw = localStorage.getItem(BG_CFG_KEY);
+                if (raw) return normalizeCfg(JSON.parse(raw), false);
+                // 旧版「背景色」只存过 alpha/blur，迁移一次滑块数值，省得用户重调
+                const legacyRaw = localStorage.getItem(LEGACY_BG_KEY);
+                if (legacyRaw) return normalizeCfg(JSON.parse(legacyRaw), true);
+            } catch (e) { /* ignore */ }
+            return Object.assign({}, BG_CFG_DEFAULT);
+        }
+
+        function saveBgCfg(patch) {
+            const next = normalizeCfg(Object.assign(getBgCfg(), patch || {}), false);
+            try { localStorage.setItem(BG_CFG_KEY, JSON.stringify(next)); } catch (e) { /* ignore */ }
+            return next;
+        }
+
+        // ---------- IndexedDB：只存一个 Blob ----------
+        function openBgDB() {
+            return new Promise((resolve, reject) => {
+                let req;
+                try { req = indexedDB.open(IDB_NAME, 1); }
+                catch (e) { reject(e); return; }
+                req.onupgradeneeded = () => {
+                    const db = req.result;
+                    if (!db.objectStoreNames.contains(IDB_STORE)) db.createObjectStore(IDB_STORE);
+                };
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(req.error || new Error('indexedDB open failed'));
+            });
+        }
+
+        function idbRun(mode, act) {
+            return openBgDB().then((db) => new Promise((resolve, reject) => {
+                let tx;
+                try { tx = db.transaction(IDB_STORE, mode); }
+                catch (e) { db.close(); reject(e); return; }
+                const store = tx.objectStore(IDB_STORE);
+                let result;
+                try {
+                    const req = act(store);
+                    if (req) req.onsuccess = () => { result = req.result; };
+                } catch (e) {
+                    // act 抛错时事务已创建，显式中止，避免留下一个空提交的事务
+                    try { tx.abort(); } catch (e2) { /* ignore */ }
+                    db.close();
+                    reject(e);
+                    return;
+                }
+                tx.oncomplete = () => { db.close(); resolve(result); };
+                // tx.error 可能为 null，reject(null) 会让调用方 catch 到 null，补一个真实 Error
+                tx.onerror = () => { db.close(); reject(tx.error || new Error('idb transaction error')); };
+                tx.onabort = () => { db.close(); reject(tx.error || new Error('idb transaction aborted')); };
+            }));
+        }
+
+        function dbGetImage() { return idbRun('readonly', (s) => s.get(IDB_KEY)); }
+        function dbPutImage(blob) { return idbRun('readwrite', (s) => s.put(blob, IDB_KEY)); }
+        function dbDelImage() { return idbRun('readwrite', (s) => s.delete(IDB_KEY)); }
+
+        function markHasImage(has) {
+            try {
+                if (has) localStorage.setItem(BG_HAS_KEY, '1');
+                else localStorage.removeItem(BG_HAS_KEY);
+            } catch (e) { /* ignore */ }
+        }
+
+        // 名字直说语义：返回 true 只代表「可能存过图片，值得去 IndexedDB 查一次」，
+        // 不代表真的存在。localStorage 读不到（无痕/被禁用）时保守返回 true，
+        // 由恢复流程自己去确认；查不到就顺手清掉标记。
+        function mayHaveStoredImage() {
+            try { return localStorage.getItem(BG_HAS_KEY) === '1'; }
+            catch (e) { return true; }
+        }
+
+        // 换图时释放旧的 objectURL，否则每换一张漏一份内存
+        function setBgImageUrl(url) {
+            const old = bgImageUrl;
+            bgImageUrl = url || '';
+            if (old && old !== bgImageUrl) {
+                try { URL.revokeObjectURL(old); } catch (e) { /* ignore */ }
+            }
+        }
+
+        // 上传图过大/过长时，等比压到 MAX_EDGE 内并优先转 WebP（保留透明），
+        // 失败则原样返回。小图完全不处理，无损。
+        function normalizeImage(file) {
+            if (file.size <= MAX_STORE_BYTES || typeof createImageBitmap !== 'function') {
+                return Promise.resolve(file);
+            }
+            return createImageBitmap(file).then((bmp) => {
+                const longest = Math.max(bmp.width, bmp.height);
+                const scale = Math.min(1, MAX_EDGE / longest);
+                const w = Math.max(1, Math.round(bmp.width * scale));
+                const h = Math.max(1, Math.round(bmp.height * scale));
+                const canvas = document.createElement('canvas');
+                canvas.width = w;
+                canvas.height = h;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) { if (bmp.close) bmp.close(); return file; }
+                ctx.drawImage(bmp, 0, 0, w, h);
+                if (bmp.close) bmp.close();
+                return new Promise((resolve) => {
+                    if (typeof canvas.toBlob !== 'function') { resolve(file); return; }
+                    canvas.toBlob((blob) => resolve(blob || file), 'image/webp', 0.9);
+                });
+            }).catch(() => file);
+        }
+
+        // ---------- 自有 style：面板样式常驻，图片层只在有图时注入 ----------
+        const bgStyle = document.createElement('style');
+        bgStyle.id = 'dsr-bg-image-style';
+        document.head.appendChild(bgStyle);
+
+        // 缩放模式 -> background-size / repeat
+        function sizeDecl(fit) {
+            switch (fit) {
+                case 'contain': return 'background-size: contain; background-repeat: no-repeat;';
+                case 'auto': return 'background-size: auto; background-repeat: no-repeat;';
+                case 'tile': return 'background-size: auto; background-repeat: repeat;';
+                default: return 'background-size: cover; background-repeat: no-repeat;';
+            }
+        }
+
+        function buildBgCSS() {
+            const cfg = getBgCfg();
+            const blur = clampNumber(cfg.blur, 0, 30, 0);
+            const opacity = clampNumber(cfg.opacity, 0, 100, 100) / 100;
+            const spread = blur > 0 ? Math.ceil(blur * 2 + 6) : 0; // 模糊向外扩散，层要外扩
+            const has = !!bgImageUrl;
+            const fit = pickEnum(cfg.fit, FIT_VALUES, 'cover');
+            const position = pickEnum(cfg.position, POSITION_VALUES, 'center center');
+
+            const transforms = [];
+            if (cfg.flipX) transforms.push('scaleX(-1)');
+            if (cfg.flipY) transforms.push('scaleY(-1)');
+            const transformDecl = transforms.length ? `transform: ${transforms.join(' ')};` : '';
+
+            // 图片层 + 容器让位：仅在有图时生成。
+            // body 自身的主题背景色作为垫底（传播到 canvas），半透明图片混到其上，
+            // 于是「调低不透明度」= 图片往主题色淡出，而不是往浏览器白底淡出。
+            const pictureCSS = has ? `
+            html, #root, #root > div,
+            .b8812f16,
+            body[data-ds-dark-theme] .b8812f16 {
+                background: transparent !important;
+            }
+            body, body[data-ds-dark-theme] {
+                --dsw-alias-bg-base: transparent;
+                --dsw-alias-bg-layer-1: transparent;
+                --dsw-specific-sidebar-fill: transparent;
+            }
+            body::after {
+                content: "";
+                position: fixed;
+                inset: -${spread}px;
+                z-index: -1;
+                background-image: url("${bgImageUrl}");
+                ${sizeDecl(fit)}
+                background-position: ${position};
+                ${transformDecl}
+                opacity: ${Math.round(opacity * 1000) / 1000};
+                filter: blur(${blur}px);
+                pointer-events: none;
+            }` : '';
+
+            return `
+            /* 主题面板增高并可滚动，容纳背景设置区块 */
+            .dsr-theme-menu { max-height: 72vh; overflow-y: auto; scrollbar-width: thin; }
+
+            /* ===== 背景设置区块（配色走主题变量，深浅色自动跟随） ===== */
+            .dsr-bg-box { display:flex; flex-direction:column; gap:6px; padding:4px 12px 10px; font-size:12px; line-height:1.4; }
+            .dsr-bg-title { font-size:11px; letter-spacing:0.04em; opacity:0.5; padding-bottom:2px; }
+            .dsr-bg-row { display:flex; align-items:center; gap:8px; white-space:nowrap; }
+            .dsr-bg-label { flex:0 0 48px; opacity:0.8; }
+            .dsr-bg-thumb { flex:0 0 30px; width:30px; height:22px; border:1px solid var(--dsw-alias-border-l2); border-radius:5px; background-color:var(--dsw-alias-bg-layer-2); background-size:cover; background-position:center; background-repeat:no-repeat; box-sizing:border-box; }
+            .dsr-bg-thumb.is-empty { border-style:dashed; opacity:0.6; }
+            .dsr-bg-pick, .dsr-bg-reset { padding:2px 8px; border:1px solid var(--dsw-alias-border-l2); border-radius:5px; background:transparent; color:inherit; font-size:11px; line-height:1.7; cursor:pointer; opacity:0.78; white-space:nowrap; }
+            .dsr-bg-pick { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; }
+            .dsr-bg-reset { margin-left:auto; }
+            .dsr-bg-pick:hover, .dsr-bg-reset:hover { opacity:1; }
+            .dsr-bg-select { flex:1; min-width:0; padding:2px 4px; border:1px solid var(--dsw-alias-border-l2); border-radius:5px; background:transparent; color:inherit; font-size:11px; line-height:1.6; cursor:pointer; }
+            .dsr-bg-grid { display:grid; grid-template-columns:repeat(3,16px); grid-template-rows:repeat(3,16px); gap:2px; }
+            .dsr-bg-cell { width:16px; height:16px; padding:0; border:1px solid var(--dsw-alias-border-l2); border-radius:3px; background:transparent; cursor:pointer; opacity:0.45; }
+            .dsr-bg-cell:hover { opacity:0.8; }
+            .dsr-bg-cell.active { opacity:1; outline:1px solid var(--dsw-alias-brand-primary); outline-offset:-1px; }
+            .dsr-bg-toggle { padding:2px 6px; border:1px solid var(--dsw-alias-border-l2); border-radius:5px; background:transparent; color:inherit; font-size:11px; line-height:1.7; cursor:pointer; opacity:0.62; }
+            .dsr-bg-toggle:hover { opacity:0.9; }
+            .dsr-bg-toggle[aria-pressed="true"] { opacity:1; border-color:var(--dsw-alias-brand-primary); color:var(--dsw-alias-brand-primary); }
+            .dsr-bg-select[disabled], .dsr-bg-toggle[disabled], .dsr-bg-cell[disabled],
+            .dsr-bg-reset[disabled] { cursor:default; opacity:0.35; }
+            .dsr-bg-range { flex:1; min-width:56px; accent-color:var(--dsw-alias-brand-primary); cursor:pointer; }
+            .dsr-bg-val { flex:0 0 36px; text-align:right; opacity:0.7; font-variant-numeric:tabular-nums; }
+            .dsr-bg-note { font-size:11px; line-height:1.4; opacity:0.5; white-space:normal; }
+            .dsr-bg-box.is-default .dsr-bg-range { opacity:0.55; }
+            .dsr-bg-box.is-default .dsr-bg-val { opacity:0.45; }
+            ${pictureCSS}
+            `;
+        }
+
+        function rebuild() { bgStyle.textContent = buildBgCSS(); }
+
+        // 拖滑块会连续触发，合并成一次刷新；带兜底定时器防 rAF 被后台节流
+        let rebuildPending = false;
+        function scheduleRebuild() {
+            if (rebuildPending) return;
+            rebuildPending = true;
+            let done = false;
+            const run = () => {
+                if (done) return;
+                done = true; rebuildPending = false; rebuild();
+            };
+            requestAnimationFrame(run);
+            setTimeout(run, 150);
+        }
+
+        // ---------- UI：挂载到已有主题面板 ----------
+        function mountUI(menu) {
+            const divider = document.createElement('div');
+            divider.className = 'dsr-theme-divider';
+            menu.appendChild(divider);
+
+            const box = document.createElement('div');
+            box.className = 'dsr-bg-box';
+            const title = document.createElement('div');
+            title.className = 'dsr-bg-title';
+            title.textContent = '背景图';
+            box.appendChild(title);
+
+            const initial = getBgCfg();
+
+            // 选图行：缩略图 + 选择图片 + 移除
+            const imgRow = document.createElement('div');
+            imgRow.className = 'dsr-bg-row';
+            const thumb = document.createElement('div');
+            thumb.className = 'dsr-bg-thumb is-empty';
+            thumb.title = '当前背景图';
+            thumb.setAttribute('role', 'img');
+            thumb.setAttribute('aria-label', '未选择背景图');
+            const pickBtn = document.createElement('button');
+            pickBtn.type = 'button';
+            pickBtn.className = 'dsr-bg-pick';
+            pickBtn.textContent = '选择图片';
+            pickBtn.title = '从本地选一张图作为页面背景';
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.accept = 'image/*';
+            fileInput.style.display = 'none';
+            fileInput.setAttribute('aria-hidden', 'true');
+            fileInput.tabIndex = -1;
+            const resetBtn = document.createElement('button');
+            resetBtn.type = 'button';
+            resetBtn.className = 'dsr-bg-reset';
+            resetBtn.textContent = '移除';
+            resetBtn.title = '删除背景图，恢复主题原底色';
+            imgRow.append(thumb, pickBtn, resetBtn, fileInput);
+            box.appendChild(imgRow);
+
+            // 不透明度行
+            const opacityRow = document.createElement('div');
+            opacityRow.className = 'dsr-bg-row';
+            const opacityLabel = document.createElement('span');
+            opacityLabel.className = 'dsr-bg-label';
+            opacityLabel.textContent = '不透明度';
+            const opacityInput = document.createElement('input');
+            opacityInput.type = 'range';
+            opacityInput.min = '0';
+            opacityInput.max = '100';
+            opacityInput.step = '1';
+            opacityInput.className = 'dsr-bg-range';
+            opacityInput.value = String(initial.opacity);
+            opacityInput.title = '背景图的不透明度，越低主题底色透出越多';
+            opacityInput.setAttribute('aria-label', '背景图不透明度');
+            const opacityVal = document.createElement('span');
+            opacityVal.className = 'dsr-bg-val';
+            opacityVal.textContent = initial.opacity + '%';
+            opacityRow.append(opacityLabel, opacityInput, opacityVal);
+            box.appendChild(opacityRow);
+
+            // 模糊行
+            const blurRow = document.createElement('div');
+            blurRow.className = 'dsr-bg-row';
+            const blurLabel = document.createElement('span');
+            blurLabel.className = 'dsr-bg-label';
+            blurLabel.textContent = '模糊值';
+            const blurInput = document.createElement('input');
+            blurInput.type = 'range';
+            blurInput.min = '0';
+            blurInput.max = '30';
+            blurInput.step = '1';
+            blurInput.className = 'dsr-bg-range';
+            blurInput.value = String(initial.blur);
+            blurInput.title = '背景图的高斯模糊半径';
+            blurInput.setAttribute('aria-label', '背景图模糊值');
+            const blurVal = document.createElement('span');
+            blurVal.className = 'dsr-bg-val';
+            blurVal.textContent = initial.blur + 'px';
+            blurRow.append(blurLabel, blurInput, blurVal);
+            box.appendChild(blurRow);
+
+            // 缩放模式行
+            const fitRow = document.createElement('div');
+            fitRow.className = 'dsr-bg-row';
+            const fitLabel = document.createElement('span');
+            fitLabel.className = 'dsr-bg-label';
+            fitLabel.textContent = '缩放';
+            const fitSelect = document.createElement('select');
+            fitSelect.className = 'dsr-bg-select';
+            fitSelect.title = '背景图的铺放方式';
+            fitSelect.setAttribute('aria-label', '背景图缩放模式');
+            FIT_VALUES.forEach((v) => {
+                const opt = document.createElement('option');
+                opt.value = v;
+                opt.textContent = FIT_LABELS[v];
+                fitSelect.appendChild(opt);
+            });
+            fitSelect.value = initial.fit;
+            fitRow.append(fitLabel, fitSelect);
+            box.appendChild(fitRow);
+
+            // 位置行：九宫格 + 两个翻转开关
+            const posRow = document.createElement('div');
+            posRow.className = 'dsr-bg-row';
+            const posLabel = document.createElement('span');
+            posLabel.className = 'dsr-bg-label';
+            posLabel.textContent = '位置';
+            const grid = document.createElement('div');
+            grid.className = 'dsr-bg-grid';
+            const posButtons = POSITION_VALUES.map((pos) => {
+                const b = document.createElement('button');
+                b.type = 'button';
+                b.className = 'dsr-bg-cell';
+                b.dataset.pos = pos;
+                b.title = POS_LABELS[pos];
+                b.setAttribute('aria-label', '背景位置：' + POS_LABELS[pos]);
+                grid.appendChild(b);
+                return b;
+            });
+            const flipXBtn = document.createElement('button');
+            flipXBtn.type = 'button';
+            flipXBtn.className = 'dsr-bg-toggle';
+            flipXBtn.textContent = '水平翻转';
+            flipXBtn.title = '水平翻转';
+            flipXBtn.setAttribute('aria-pressed', 'false');
+            const flipYBtn = document.createElement('button');
+            flipYBtn.type = 'button';
+            flipYBtn.className = 'dsr-bg-toggle';
+            flipYBtn.textContent = '垂直翻转';
+            flipYBtn.title = '垂直翻转';
+            flipYBtn.setAttribute('aria-pressed', 'false');
+            posRow.append(posLabel, grid, flipXBtn, flipYBtn);
+            box.appendChild(posRow);
+
+            const note = document.createElement('div');
+            note.className = 'dsr-bg-note';
+            box.appendChild(note);
+            menu.appendChild(box);
+
+            // 面板内交互全部落在 box 里：这里统一止住冒泡，避免被 document 判成「点击外部」而收起。
+            // 用委托而不是逐个控件挂，才能覆盖之后新增的 select / 九宫格 / 翻转按钮。
+            ['click', 'mousedown', 'pointerdown', 'touchstart'].forEach((type) => {
+                box.addEventListener(type, (e) => e.stopPropagation());
+            });
+
+            function syncUI() {
+                const cfg = getBgCfg();
+                const has = !!bgImageUrl;
+                box.classList.toggle('is-default', !has);
+                thumb.classList.toggle('is-empty', !has);
+                thumb.style.backgroundImage = has ? `url("${bgImageUrl}")` : '';
+                thumb.setAttribute('aria-label', has ? '当前背景图缩略图' : '未选择背景图');
+                opacityInput.value = String(cfg.opacity);
+                opacityVal.textContent = Math.round(cfg.opacity) + '%';
+                blurInput.value = String(cfg.blur);
+                blurVal.textContent = Math.round(cfg.blur) + 'px';
+                fitSelect.value = cfg.fit;
+                posButtons.forEach((b) => b.classList.toggle('active', b.dataset.pos === cfg.position));
+                flipXBtn.setAttribute('aria-pressed', cfg.flipX ? 'true' : 'false');
+                flipYBtn.setAttribute('aria-pressed', cfg.flipY ? 'true' : 'false');
+                // 没图时这些选项无意义，直接禁用（视觉变淡 + 真正不可聚焦）
+                fitSelect.disabled = !has;
+                posButtons.forEach((b) => { b.disabled = !has; });
+                flipXBtn.disabled = !has;
+                flipYBtn.disabled = !has;
+                resetBtn.disabled = !has;
+                note.textContent = has
+                    ? '当前：' + FIT_LABELS[cfg.fit] + '；不透明度越低主题底色透出越多'
+                    : '未选图片时背景跟随主题，支持 jpg / png / webp / gif';
+            }
+            bgSyncUI = syncUI;
+            syncUI();
+
+            opacityInput.addEventListener('input', () => {
+                opacityVal.textContent = opacityInput.value + '%';
+                saveBgCfg({ opacity: Number(opacityInput.value) });
+                scheduleRebuild();
+            });
+            blurInput.addEventListener('input', () => {
+                blurVal.textContent = blurInput.value + 'px';
+                saveBgCfg({ blur: Number(blurInput.value) });
+                scheduleRebuild();
+            });
+            fitSelect.addEventListener('change', () => {
+                saveBgCfg({ fit: fitSelect.value });
+                syncUI();
+                rebuild();
+            });
+            posButtons.forEach((b) => b.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (!bgImageUrl) return;
+                saveBgCfg({ position: b.dataset.pos });
+                syncUI();
+                rebuild();
+            }));
+            flipXBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (!bgImageUrl) return;
+                saveBgCfg({ flipX: !getBgCfg().flipX });
+                syncUI();
+                rebuild();
+            });
+            flipYBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (!bgImageUrl) return;
+                saveBgCfg({ flipY: !getBgCfg().flipY });
+                syncUI();
+                rebuild();
+            });
+            pickBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                fileInput.click();
+            });
+            fileInput.addEventListener('change', () => {
+                const file = fileInput.files && fileInput.files[0];
+                fileInput.value = '';
+                if (!file) return;
+                if (!/^image\//.test(file.type)) {
+                    note.textContent = '只支持图片文件（jpg / png / webp / gif）';
+                    return;
+                }
+                // 先立即上图（原图 objectURL，零等待），再异步压缩落盘
+                setBgImageUrl(URL.createObjectURL(file));
+                syncUI();
+                rebuild();
+
+                const oversized = file.size > MAX_STORE_BYTES;
+                if (oversized) note.textContent = '图片较大，正在压缩后保存…';
+
+                normalizeImage(file).then((blob) => dbPutImage(blob).then(() => blob)).then((blob) => {
+                    markHasImage(true);
+                    note.textContent = (blob !== file)
+                        ? '已压缩到 ' + Math.round(blob.size / 1024) + ' KB 并保存，下次打开自动恢复'
+                        : '已保存到本地，下次打开自动恢复';
+                }).catch(() => {
+                    note.textContent = '图片仅本次会话有效：浏览器存储写入失败';
+                });
+            });
+            resetBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                dbDelImage().catch(() => { /* ignore */ });
+                markHasImage(false);
+                setBgImageUrl('');
+                syncUI();
+                rebuild();
+            });
+        }
+
+        // 主题面板在本模块之前已由 createThemePicker 建好；加轮询兜底防时序变化
+        let mountTries = 0;
+        (function tryMount() {
+            const menu = document.querySelector('.dsr-theme-menu');
+            if (menu) {
+                mountUI(menu);
+            } else if (mountTries++ < 40) {
+                setTimeout(tryMount, 50);
+            }
+        })();
+
+        // 展开面板时移除首次使用引导气泡（原写在 createThemePicker 内）
+        const themeBtn = document.querySelector('.dsr-theme-btn');
+        if (themeBtn) {
+            themeBtn.addEventListener('click', () => {
+                const tip = document.querySelector('.dsr-replacer-tip');
+                if (tip) tip.remove();
+            });
+        }
+
+        rebuild();
+
+        // 首帧后从 IndexedDB 恢复图片（异步，读完重建一次样式与 UI）
+        (function restoreBgImage() {
+            if (!mayHaveStoredImage()) return;
+            try {
+                dbGetImage().then((blob) => {
+                    if (!blob) { markHasImage(false); return; }
+                    setBgImageUrl(URL.createObjectURL(blob));
+                    rebuild();
+                    if (typeof bgSyncUI === 'function') bgSyncUI();
+                }).catch(() => { /* 无痕模式等场景 IndexedDB 不可用，静默降级为跟随主题 */ });
+            } catch (e) { /* ignore */ }
+        })();
+    })();
+
+
 })();
